@@ -20,20 +20,9 @@ class AbstractDistributedTracer(SansIOHTTPPolicy):
         self.parent_span_param_name = parent_span_param_name
         self.span_dict = {}
 
-    def get_variable_from_request(self, request, variable):
-        # type: (PipelineRequest[HTTPRequestType], str) -> Any
-        value = None
-        if variable in request.context.options:
-            value = request.context.options[variable]
-            del request.context.options[variable]
-
-        return value
-
     def on_request(self, request, **kwargs):
         # type: (PipelineRequest[HTTPRequestType], Any) -> None
-        parent_span = self.get_variable_from_request(
-            request, self.parent_span_param_name
-        )
+        parent_span = request.context.options.pop(self.parent_span_param_name, None)
 
         if parent_span is None:
             return
@@ -50,13 +39,12 @@ class AbstractDistributedTracer(SansIOHTTPPolicy):
     def end_span(self, request):
         # type: (PipelineRequest[HTTPRequestType]) -> Any
         span = None
-        if self.header_label in request.http_request.headers:
-            span_id = request.http_request.headers[self.header_label]
-            span = self.span_dict[span_id]
+        span_id = request.http_request.headers.pop(self.header_label, None)
+        if span_id is not None:
+            span = self.span_dict.pop(span_id, None)
             if span:
                 span = self.finish_span(span)
-                del self.span_dict[span_id]
-                del request.http_request.headers[self.header_label]
+
         return span
 
     def on_response(self, request, response, **kwargs):
@@ -110,8 +98,8 @@ class DistributedTracingOpencensus(AbstractDistributedTracer):
 
     def attach_extra_information(self, child, request, **kwargs):
         # type: (Any, PipelineRequest[HTTPRequestType], Any) -> Any
-        attributes = self.get_variable_from_request(request, "attributes")
-        annotations = self.get_variable_from_request(request, "annotations")
+        attributes = request.context.options.pop("attributes", None)
+        annotations = request.context.options.pop("annotations", None)
 
         if attributes is not None:
             for key in attributes:
@@ -146,7 +134,7 @@ class DistributedTracingOpencensus(AbstractDistributedTracer):
 class DistributedTracingDataDog(DistributedTracingOpencensus):
     def attach_extra_information(self, child, request, **kwargs):
         # type: (Any, PipelineRequest[HTTPRequestType], Any) -> Any
-        tags = self.get_variable_from_request(request, "tags")
+        tags = request.context.options.pop("tags", None)
 
         if tags is not None:
             for key in tags:
