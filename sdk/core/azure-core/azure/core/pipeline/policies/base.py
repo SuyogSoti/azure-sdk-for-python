@@ -107,7 +107,7 @@ class RequestHistory(object):
 
     This is used to document requests/responses that resulted in redirected requests.
     """
- 
+
     def __init__(self, http_request, http_response=None, error=None, context=None):
         # type: (PipelineRequest[HTTPRequestType], Exception, Optional[Dict[str, Any]]) -> None
         self.http_request = copy.deepcopy(http_request)
