@@ -65,11 +65,12 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # NOTE: This only supports opencensus
-def useOpencensus(func):
+def use_distributed_traces(func):
     # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
     @functools.wraps(func)
-    def wrapper_use_opencensus(self, *args, parent_span=None, **kwargs):
+    def wrapper_use_tracer(self, *args, **kwargs):
         # type: (Any) -> Any
+        parent_span = kwargs.pop("parent_span", None)
         if parent_span is None:
             return func(self, *args, **kwargs)
 
@@ -91,7 +92,7 @@ def useOpencensus(func):
             ans = func(self, parent_span=parent_span, *args, **kwargs)
         return ans
 
-    return wrapper_use_opencensus
+    return wrapper_use_tracer
 
 
 class _SansIOHTTPPolicyRunner(HTTPPolicy, Generic[HTTPRequestType, HTTPResponseType]):
