@@ -27,19 +27,71 @@
 import json
 import logging
 import os.path
+import functools
+
 try:
     from urlparse import urlparse
 except ImportError:
     from urllib.parse import urlparse
 import xml.etree.ElementTree as ET
-from azure.core.pipeline import AbstractContextManager, PipelineRequest, PipelineResponse, PipelineContext
+from azure.core.pipeline import (
+    AbstractContextManager,
+    PipelineRequest,
+    PipelineResponse,
+    PipelineContext,
+)
 from azure.core.pipeline.policies import HTTPPolicy, SansIOHTTPPolicy
-from typing import TYPE_CHECKING, Generic, TypeVar, cast, IO, List, Union, Any, Mapping, Dict, Optional, Tuple, Callable, Iterator  # pylint: disable=unused-import
+from typing import (
+    TYPE_CHECKING,
+    Generic,
+    TypeVar,
+    cast,
+    IO,
+    List,
+    Union,
+    Any,
+    Mapping,
+    Dict,
+    Optional,
+    Tuple,
+    Callable,
+    Iterator,
+)  # pylint: disable=unused-import
 
 HTTPResponseType = TypeVar("HTTPResponseType")
 HTTPRequestType = TypeVar("HTTPRequestType")
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# NOTE: This only supports opencensus
+def useOpencensus(func):
+    # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
+    @functools.wraps(func)
+    def wrapper_use_opencensus(self, *args, parent_span=None, **kwargs):
+        # type: (Any) -> Any
+        if parent_span is None:
+            return func(self, *args, **kwargs)
+
+        name = (
+            self.__class__.__name__
+            + "."
+            + func.__name__
+            + "("
+            + ", ".join([str(i) for i in args])
+            + ")"
+        )
+        ans = None
+        if callable(getattr(parent_span, "span", None)):
+            child = parent_span.span(name=name)
+            child.start()
+            ans = func(self, parent_span=child, *args, **kwargs)
+            child.finish()
+        else:
+            ans = func(self, parent_span=parent_span, *args, **kwargs)
+        return ans
+
+    return wrapper_use_opencensus
 
 
 class _SansIOHTTPPolicyRunner(HTTPPolicy, Generic[HTTPRequestType, HTTPResponseType]):
@@ -65,7 +117,6 @@ class _SansIOHTTPPolicyRunner(HTTPPolicy, Generic[HTTPRequestType, HTTPResponseT
 
 
 class _TransportRunner(HTTPPolicy):
-
     def __init__(self, sender):
         # type: (HttpTransport) -> None
         super(_TransportRunner, self).__init__()
@@ -75,7 +126,7 @@ class _TransportRunner(HTTPPolicy):
         return PipelineResponse(
             request.http_request,
             self._sender.send(request.http_request, **request.context.options),
-            context=request.context
+            context=request.context,
         )
 
 
@@ -91,13 +142,13 @@ class Pipeline(AbstractContextManager, Generic[HTTPRequestType, HTTPResponseType
         self._impl_policies = []  # type: List[HTTPPolicy]
         self._transport = transport  # type: HTTPPolicy
 
-        for policy in (policies or []):
+        for policy in policies or []:
             if isinstance(policy, SansIOHTTPPolicy):
                 self._impl_policies.append(_SansIOHTTPPolicyRunner(policy))
             elif policy:
                 self._impl_policies.append(policy)
-        for index in range(len(self._impl_policies)-1):
-            self._impl_policies[index].next = self._impl_policies[index+1]
+        for index in range(len(self._impl_policies) - 1):
+            self._impl_policies[index].next = self._impl_policies[index + 1]
         if self._impl_policies:
             self._impl_policies[-1].next = _TransportRunner(self._transport)
 
@@ -112,6 +163,12 @@ class Pipeline(AbstractContextManager, Generic[HTTPRequestType, HTTPResponseType
     def run(self, request, **kwargs):
         # type: (HTTPRequestType, Any) -> PipelineResponse
         context = PipelineContext(self._transport, **kwargs)
-        pipeline_request = PipelineRequest(request, context)  # type: PipelineRequest[HTTPRequestType]
-        first_node = self._impl_policies[0] if self._impl_policies else _TransportRunner(self._transport)
+        pipeline_request = PipelineRequest(
+            request, context
+        )  # type: PipelineRequest[HTTPRequestType]
+        first_node = (
+            self._impl_policies[0]
+            if self._impl_policies
+            else _TransportRunner(self._transport)
+        )
         return first_node.send(pipeline_request)  # type: ignore
