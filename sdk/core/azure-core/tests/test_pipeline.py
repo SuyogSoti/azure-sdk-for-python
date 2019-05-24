@@ -37,7 +37,6 @@ except ImportError:
 import xml.etree.ElementTree as ET
 import sys
 
-import requests
 import pytest
 
 from azure.core import Configuration
@@ -153,7 +152,7 @@ class TestClientRequest(unittest.TestCase):
 
 class MyPipeline:
     def __init__(self, policies=None):
-        self.request = HttpRequest("GET", "http://127.0.0.1/")
+        self.request = HttpRequest("GET", "https://bing.com")
         if policies is None:
             policies = []
         self.transport = RequestsTransport()
