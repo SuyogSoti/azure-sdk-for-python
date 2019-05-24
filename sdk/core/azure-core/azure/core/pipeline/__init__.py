@@ -113,13 +113,14 @@ class PipelineResponse(object):
         self.context = context
 
 
-from .base import Pipeline
+from .base import Pipeline, use_distributed_traces
 
 __all__ = [
     'Pipeline',
     'PipelineRequest',
     'PipelineResponse',
-    'PipelineContext'
+    'PipelineContext',
+    'use_distributed_traces'
 ]
 
 try:

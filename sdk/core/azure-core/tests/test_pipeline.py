@@ -41,17 +41,17 @@ import requests
 import pytest
 
 from azure.core import Configuration
-from azure.core.pipeline import Pipeline
+from azure.core.pipeline import Pipeline, use_distributed_traces
 from azure.core.pipeline.policies import (
     SansIOHTTPPolicy,
     UserAgentPolicy,
-    RedirectPolicy
+    RedirectPolicy,
 )
-from azure.core.pipeline.transport import (
-    HttpRequest,
-    HttpTransport,
-    RequestsTransport,
+from azure.core.pipeline.policies.distributed_tracing import (
+    DistributedTracingOpencensus,
+    DistributedTracingDataDog,
 )
+from azure.core.pipeline.transport import HttpRequest, HttpTransport, RequestsTransport
 
 from azure.core.configuration import Configuration
 
@@ -86,16 +86,13 @@ def test_sans_io_exception():
     with pytest.raises(NotImplementedError):
         pipeline.run(req)
 
-class TestRequestsTransport(unittest.TestCase):
 
+class TestRequestsTransport(unittest.TestCase):
     def test_basic_requests(self):
 
         conf = Configuration()
         request = HttpRequest("GET", "https://bing.com")
-        policies = [
-            UserAgentPolicy("myusergant"),
-            RedirectPolicy()
-        ]
+        policies = [UserAgentPolicy("myusergant"), RedirectPolicy()]
         with Pipeline(RequestsTransport(conf), policies=policies) as pipeline:
             response = pipeline.run(request)
 
@@ -107,10 +104,7 @@ class TestRequestsTransport(unittest.TestCase):
         conf = Configuration()
         session = requests.Session()
         request = HttpRequest("GET", "https://bing.com")
-        policies = [
-            UserAgentPolicy("myusergant"),
-            RedirectPolicy()
-        ]
+        policies = [UserAgentPolicy("myusergant"), RedirectPolicy()]
         transport = RequestsTransport(conf, session=session, session_owner=False)
         with Pipeline(transport, policies=policies) as pipeline:
             response = pipeline.run(request)
@@ -155,6 +149,117 @@ class TestClientRequest(unittest.TestCase):
         request.format_parameters({"g": "h"})
 
         self.assertIn(request.url, ["a/b/c?g=h&t=y", "a/b/c?t=y&g=h"])
+
+
+class MyPipeline:
+    def __init__(self, policies=None):
+        self.request = HttpRequest("GET", "http://127.0.0.1/")
+        if policies is None:
+            policies = []
+        self.transport = RequestsTransport()
+        self.pipeline = Pipeline(self.transport, policies=policies)
+
+    @use_distributed_traces
+    def run(self, numbTimes, **kwargs):
+        if numbTimes < 1:
+            return None
+        response = self.pipeline.run(self.request, **kwargs)
+        self.run(numbTimes - 1, **kwargs)
+        return response
+
+
+class ModelOpencensusSpan:
+    def __init__(self, name):
+        self.name = name
+        self.span_id = 0
+        self.children = []
+        self.attrs = {}
+        self.annotations = []
+        self.start_time = None
+        self.end_time = None
+
+    def span(self, name="child_span"):
+        child = ModelOpencensusSpan(name)
+        self.children.append(child)
+        return child
+
+    def add_attribute(self, attribute_key, attribute_value):
+        self.attrs[attribute_key] = attribute_value
+
+    def add_annotation(self, description, **attrs):
+        self.annotations.append(description)
+
+    def start(self):
+        self.start_time = 0
+
+    def finish(self):
+        self.end_time = 1
+
+
+class ModelDataDogSpan:
+    def __init__(self, name):
+        self.name = name
+        self.span_id = 0
+        self.attrs = {}
+        self.annotations = []
+        self.children = []
+        self.start_time = None
+        self.end_time = None
+        self.start = 0
+
+    class Tracer:
+        def start_span(self, name="", child_of=None):
+            child = ModelDataDogSpan(name)
+            if child_of is not None:
+                child_of.children.append(child)
+            return child
+
+    def tracer(self):
+        return self.Tracer()
+
+    def set_tag(self, attribute_key, attribute_value):
+        self.attrs[attribute_key] = attribute_value
+
+    def finish(self):
+        self.end_time = 1
+
+
+class TestUseDistributedTraces(unittest.TestCase):
+    def test_with_parent_span_with_opencensus(self):
+        pipeline = MyPipeline(policies=[DistributedTracingOpencensus()])
+        parent = ModelOpencensusSpan("Overall")
+        attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
+        annotations = ["first Ann", "Second Ann"]
+        pipeline.run(
+            2, parent_span=parent, annotations=annotations, attributes=attrs
+        )
+        assert len(parent.children[0].children) == 2
+        span = parent.children[0].children[0]
+        assert attrs == span.attrs
+        assert annotations == span.annotations
+
+    def test_with_parent_span_with_datadog(self):
+        pipeline = MyPipeline(policies=[DistributedTracingDataDog()])
+        parent = ModelDataDogSpan("Overall")
+        attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
+        pipeline.run(2, parent_span=parent, tags=attrs)
+        assert len(parent.children) == 2
+
+    def test_without_parent_span_with_tracing_policies(self):
+        pipeline = MyPipeline(policies=[DistributedTracingOpencensus()])
+        pipeline.run(2)
+        pipeline = MyPipeline(policies=[DistributedTracingDataDog()])
+        pipeline.run(2)
+
+    def test_with_parent_span_without_tracing_policies(self):
+        pipeline = MyPipeline(policies=[])
+        parent = ModelOpencensusSpan("Overall")
+        with pytest.raises(TypeError):
+            pipeline.run(2, parent_span=parent)
+
+    def test_without_parent_span_without_tracing_policies(self):
+        pipeline = MyPipeline(policies=[])
+        pipeline.run(2)
 
 
 if __name__ == "__main__":
