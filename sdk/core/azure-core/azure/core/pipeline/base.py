@@ -34,8 +34,10 @@ from azure.core.pipeline.policies import HTTPPolicy, SansIOHTTPPolicy
 
 HTTPResponseType = TypeVar("HTTPResponseType")
 HTTPRequestType = TypeVar("HTTPRequestType")
+HttpTransportType = TypeVar("HttpTransportType")
 
 _LOGGER = logging.getLogger(__name__)
+PoliciesType = List[Union[HTTPPolicy, SansIOHTTPPolicy]]
 
 
 # NOTE: This only supports opencensus
@@ -79,7 +81,7 @@ class _SansIOHTTPPolicyRunner(HTTPPolicy, Generic[HTTPRequestType, HTTPResponseT
         self._policy = policy
 
     def send(self, request):
-        # type: (PipelineRequest[HTTPRequestType], Any) -> PipelineResponse[HTTPRequestType, HTTPResponseType]
+        # type: (PipelineRequest) -> PipelineResponse
         self._policy.on_request(request)
         try:
             response = self.next.send(request)
@@ -93,7 +95,7 @@ class _SansIOHTTPPolicyRunner(HTTPPolicy, Generic[HTTPRequestType, HTTPResponseT
 
 class _TransportRunner(HTTPPolicy):
     def __init__(self, sender):
-        # type: (HttpTransport) -> None
+        # type: (HttpTransportType) -> None
         super(_TransportRunner, self).__init__()
         self._sender = sender
 
@@ -113,9 +115,9 @@ class Pipeline(AbstractContextManager, Generic[HTTPRequestType, HTTPResponseType
     """
 
     def __init__(self, transport, policies=None):
-        # type: (HttpTransport, List[Union[HTTPPolicy, SansIOHTTPPolicy]]) -> None
+        # type: (HttpTransportType, PoliciesType) -> None
         self._impl_policies = []  # type: List[HTTPPolicy]
-        self._transport = transport  # type: HTTPPolicy
+        self._transport = transport  # type: ignore
 
         for policy in policies or []:
             if isinstance(policy, SansIOHTTPPolicy):
@@ -129,7 +131,7 @@ class Pipeline(AbstractContextManager, Generic[HTTPRequestType, HTTPResponseType
 
     def __enter__(self):
         # type: () -> Pipeline
-        self._transport.__enter__()
+        self._transport.__enter__() # type: ignore
         return self
 
     def __exit__(self, *exc_details):  # pylint: disable=arguments-differ
