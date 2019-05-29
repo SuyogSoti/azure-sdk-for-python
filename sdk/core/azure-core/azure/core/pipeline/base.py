@@ -24,13 +24,27 @@
 #
 # --------------------------------------------------------------------------
 
+import functools
 import logging
 
-import functools
-from typing import (TYPE_CHECKING, Generic, TypeVar, cast, IO, List, Union, Any, Mapping, Dict, Optional, # pylint: disable=unused-import
-                    Tuple, Callable, Iterator)
-from azure.core.pipeline import AbstractContextManager, PipelineRequest, PipelineResponse, PipelineContext
+from azure.core.pipeline import (
+    AbstractContextManager,
+    PipelineRequest,
+    PipelineResponse,
+    PipelineContext,
+)
+from azure.core.pipeline.distributed_tracing.context import tracing_context
+from azure.core.pipeline.distributed_tracing.span import AbstractSpan, AzureSpan, OpenCensusSpan, DataDogSpan
 from azure.core.pipeline.policies import HTTPPolicy, SansIOHTTPPolicy
+from typing import (
+    Generic,
+    TypeVar,
+    List,
+    Union,
+    Any,
+    # pylint: disable=unused-import
+    Callable,
+)
 
 HTTPResponseType = TypeVar("HTTPResponseType")
 HTTPRequestType = TypeVar("HTTPRequestType")
@@ -40,32 +54,44 @@ _LOGGER = logging.getLogger(__name__)
 PoliciesType = List[Union[HTTPPolicy, SansIOHTTPPolicy]]
 
 
-# NOTE: This only supports opencensus
 def use_distributed_traces(func):
     # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
     @functools.wraps(func)
     def wrapper_use_tracer(self, *args, **kwargs):
         # type: (Any) -> Any
-        parent_span = kwargs.pop("parent_span", None)
-        if parent_span is None:
-            return func(self, *args, **kwargs)
 
         name = (
-            self.__class__.__name__
-            + "."
-            + func.__name__
-            + "("
-            + ", ".join([str(i) for i in args])
-            + ")"
+                self.__class__.__name__
+                + "."
+                + func.__name__
+                + "("
+                + ", ".join([str(i) for i in args])
+                + ")"
         )
-        ans = None
-        if callable(getattr(parent_span, "span", None)):
-            child = parent_span.span(name=name)
-            child.start()
-            ans = func(self, parent_span=child, *args, **kwargs)
-            child.finish()
+
+        parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
+        tracer_impl = kwargs.pop("tracer", None)  # type: str
+
+        if parent_span is None:
+            parent_span = tracing_context.get_current_span()
         else:
-            ans = func(self, parent_span=parent_span, *args, **kwargs)
+            tracer_dict = {
+                "opencensus": OpenCensusSpan,
+                'datadog': DataDogSpan
+            }
+            abs_class = tracer_dict.get(tracer_impl, OpenCensusSpan)
+            parent_span = abs_class(parent_span)
+
+        if parent_span is None:
+            parent_span = AzureSpan(name="use_distributed_traces_decorator")
+
+        # not all functions will take in parent_span
+        child = parent_span.span(name=name)
+        child.start()
+        tracing_context.set_current_span(child)
+        ans = func(self, *args, **kwargs)
+        child.finish()
+
         return ans
 
     return wrapper_use_tracer
@@ -85,7 +111,7 @@ class _SansIOHTTPPolicyRunner(HTTPPolicy, Generic[HTTPRequestType, HTTPResponseT
         self._policy.on_request(request)
         try:
             response = self.next.send(request)
-        except Exception: #pylint: disable=broad-except
+        except Exception:  # pylint: disable=broad-except
             if not self._policy.on_exception(request):
                 raise
         else:
@@ -131,7 +157,7 @@ class Pipeline(AbstractContextManager, Generic[HTTPRequestType, HTTPResponseType
 
     def __enter__(self):
         # type: () -> Pipeline
-        self._transport.__enter__() # type: ignore
+        self._transport.__enter__()  # type: ignore
         return self
 
     def __exit__(self, *exc_details):  # pylint: disable=arguments-differ
