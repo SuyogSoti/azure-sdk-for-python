@@ -147,6 +147,7 @@ class TestClientRequest(unittest.TestCase):
 
 
 class MockClient:
+    @use_distributed_traces
     def __init__(self, policies=None):
         self.request = HttpRequest("GET", "https://bing.com")
         if policies is None:
@@ -158,6 +159,7 @@ class MockClient:
 
         self.expected_response = mock.Mock(spec=PipelineResponse)
 
+    @use_distributed_traces
     def verify_request(self, request):
         if len(self.policies) > 1:
             assert request.http_request.headers['span_id'] is not None
