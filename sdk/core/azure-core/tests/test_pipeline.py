@@ -38,11 +38,12 @@ import sys
 
 import pytest
 
-from azure.core.pipeline import Pipeline, use_distributed_traces
+from azure.core.pipeline import Pipeline, use_distributed_traces, PipelineResponse
 from azure.core.pipeline.policies import (
     SansIOHTTPPolicy,
     UserAgentPolicy,
     RedirectPolicy,
+    HTTPPolicy,
 )
 from azure.core.pipeline.policies.distributed_tracing import DistributedTracer
 from azure.core.pipeline.transport import HttpRequest, HttpTransport, RequestsTransport
@@ -145,21 +146,35 @@ class TestClientRequest(unittest.TestCase):
         self.assertIn(request.url, ["a/b/c?g=h&t=y", "a/b/c?t=y&g=h"])
 
 
-class MyPipeline:
+class MockClient:
     def __init__(self, policies=None):
         self.request = HttpRequest("GET", "https://bing.com")
         if policies is None:
             policies = []
-        self.transport = RequestsTransport()
+        policies.append(mock.Mock(spec=HTTPPolicy, send=self.verify_request))
+        self.policies = policies
+        self.transport = mock.Mock(spec=HttpTransport)
         self.pipeline = Pipeline(self.transport, policies=policies)
 
+        self.expected_response = mock.Mock(spec=PipelineResponse)
+
+    def verify_request(self, request):
+        if len(self.policies) > 1:
+            assert request.http_request.headers['span_id'] is not None
+        return self.expected_response
+
     @use_distributed_traces
-    def run(self, numbTimes, **kwargs):
-        if numbTimes < 1:
+    def make_request(self, numb_times, **kwargs):
+        if numb_times < 1:
             return None
         response = self.pipeline.run(self.request, **kwargs)
-        self.run(numbTimes - 1, **kwargs)
+        self.get_foo()
+        self.make_request(numb_times - 1, **kwargs)
         return response
+
+    @use_distributed_traces
+    def get_foo(self):
+        return 5
 
 
 class ModelOpencensusSpan:
@@ -219,12 +234,19 @@ class ModelDataDogSpan:
 
 
 class TestUseDistributedTraces(unittest.TestCase):
+    def test_use_distributed_traces_decorator(self):
+        client = MockClient(policies=[])
+        parent = ModelOpencensusSpan("Overall")
+        client.get_foo(parent_span=parent, tracer="opencensus")
+        assert parent.children[0].name == "MockClient.get_foo()"
+        assert len(parent.children[0].children) == 0
+
     def test_with_parent_span_with_opencensus(self):
-        pipeline = MyPipeline(policies=[DistributedTracer()])
+        client = MockClient(policies=[DistributedTracer()])
         parent = ModelOpencensusSpan("Overall")
         attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
         annotations = ["first Ann", "Second Ann"]
-        pipeline.run(
+        client.make_request(
             2, parent_span=parent, tracer="opencensus"
         )
         assert len(parent.children[0].children) == 2
@@ -234,29 +256,28 @@ class TestUseDistributedTraces(unittest.TestCase):
         # assert annotations == span.annotations
 
     def test_with_parent_span_with_datadog(self):
-        pipeline = MyPipeline(policies=[DistributedTracer()])
+        client = MockClient(policies=[DistributedTracer()])
         parent = ModelDataDogSpan("Overall")
         attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
-        pipeline.run(2, parent_span=parent, tracer="datadog")
-        print(vars(parent))
+        client.make_request(2, parent_span=parent, tracer="datadog")
         assert len(parent.children[0].children) == 2
         # TODO(suyogsoti)figure out a way to add annotations
 
     def test_without_parent_span_with_tracing_policies(self):
-        pipeline = MyPipeline(policies=[DistributedTracer()])
-        pipeline.run(2)
-        pipeline = MyPipeline(policies=[DistributedTracer()])
-        pipeline.run(2)
+        client = MockClient(policies=[DistributedTracer()])
+        res = client.make_request(2)
+        assert res is client.expected_response
 
     def test_with_parent_span_without_tracing_policies(self):
-        pipeline = MyPipeline(policies=[])
+        client = MockClient(policies=[])
         parent = ModelOpencensusSpan("Overall")
-        pipeline.run(2, parent_span=parent)
+        client.make_request(2, parent_span=parent)
         assert len(parent.children[0].children) == 1
 
     def test_without_parent_span_without_tracing_policies(self):
-        pipeline = MyPipeline(policies=[])
-        pipeline.run(2)
+        client = MockClient(policies=[])
+        res = client.make_request(2)
+        assert res is client.expected_response
 
 
 if __name__ == "__main__":
