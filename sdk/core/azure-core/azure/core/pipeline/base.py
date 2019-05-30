@@ -34,7 +34,7 @@ from azure.core.pipeline import (
     PipelineContext,
 )
 from azure.core.pipeline.distributed_tracing.context import tracing_context
-from azure.core.pipeline.distributed_tracing.span import AbstractSpan, AzureSpan, OpenCensusSpan, DataDogSpan
+from azure.core.pipeline.distributed_tracing.span import AbstractSpan, OpenCensusSpan, DataDogSpan
 from azure.core.pipeline.policies import HTTPPolicy, SansIOHTTPPolicy
 from typing import (
     Generic,
@@ -82,16 +82,15 @@ def use_distributed_traces(func):
             abs_class = tracer_dict.get(tracer_impl, OpenCensusSpan)
             parent_span = abs_class(parent_span)
 
+        ans = None
         if parent_span is None:
-            parent_span = AzureSpan(name="use_distributed_traces_decorator")
-
-        # not all functions will take in parent_span
-        child = parent_span.span(name=name)
-        child.start()
-        tracing_context.set_current_span(child)
-        ans = func(self, *args, **kwargs)
-        child.finish()
-
+            ans = func(self, *args, **kwargs)
+        else:
+            child = parent_span.span(name=name)
+            child.start()
+            tracing_context.set_current_span(child)
+            ans = func(self, *args, **kwargs)
+            child.finish()
         return ans
 
     return wrapper_use_tracer

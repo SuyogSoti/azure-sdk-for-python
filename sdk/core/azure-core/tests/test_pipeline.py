@@ -46,6 +46,7 @@ from azure.core.pipeline.policies import (
     HTTPPolicy,
 )
 from azure.core.pipeline.policies.distributed_tracing import DistributedTracer
+from azure.core.pipeline.distributed_tracing.context import tracing_context
 from azure.core.pipeline.transport import HttpRequest, HttpTransport, RequestsTransport
 
 from azure.core.configuration import Configuration
@@ -161,8 +162,11 @@ class MockClient:
 
     @use_distributed_traces
     def verify_request(self, request):
-        if len(self.policies) > 1:
-            assert request.http_request.headers['span_id'] is not None
+        current_span = tracing_context.get_current_span()
+        header = current_span.to_header()
+        if len(self.policies) > 1 and current_span is not None:
+            dist_pol = self.policies[0]
+            assert request.http_request.headers[dist_pol.header_label] == header
         return self.expected_response
 
     @use_distributed_traces
@@ -188,6 +192,7 @@ class ModelOpencensusSpan:
         self.annotations = []
         self.start_time = None
         self.end_time = None
+        self.context_tracer = None
 
     def span(self, name="child_span"):
         child = ModelOpencensusSpan(name)
@@ -217,6 +222,7 @@ class ModelDataDogSpan:
         self.start_time = None
         self.end_time = None
         self.start = 0
+        self.trace_id = 0
 
     class Tracer:
         def start_span(self, name="", child_of=None):

@@ -77,52 +77,6 @@ class AbstractSpan(Protocol):
         pass
 
 
-class AzureSpan:
-    def __init__(self, name="span"):
-        # type: (str) -> None
-        self.span_id = str(randint(1000000, 10000000)) + "-" + str(time.time())
-        self.name = name
-        self.start_time = time.time()
-        self.attrs = {}
-        self.annotations = {}
-        self.children = []
-        self.end_time = None
-        self.parent_span = None
-
-    def span(self, name="child_span"):
-        # type: (str) -> AzureSpan
-        child = AzureSpan(name=name)
-        child.parent_span = self
-        self.children.append(child)
-        return child
-
-    def start(self, start_time=None):
-        # type: () -> None
-        if start_time is None:
-            self.start_time = time.time()
-        else:
-            self.start_time = start_time
-
-    def add_attribute(self, key, val):
-        # type: (str, str) -> None
-        self.attrs[key] = val
-
-    def add_annotation(self, descp, **attrs):
-        # type: (str, Any) -> None
-        self.annotations[time.time()] = descp
-
-    def finish(self, end_time=None):
-        # type: () -> None
-        if end_time is None:
-            self.end_time = time.time()
-        else:
-            self.end_time = end_time
-
-    def to_header(self):
-        # type: () -> bytes
-        return str(vars(self))
-
-
 class OpenCensusSpan:
     def __init__(self, span):
         # type: (Any) -> None

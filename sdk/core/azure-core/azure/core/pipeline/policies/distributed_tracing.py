@@ -1,6 +1,6 @@
 from azure.core.pipeline import PipelineRequest, PipelineResponse
 from azure.core.pipeline.distributed_tracing.context import tracing_context
-from azure.core.pipeline.distributed_tracing.span import AbstractSpan, AzureSpan
+from azure.core.pipeline.distributed_tracing.span import AbstractSpan
 from azure.core.pipeline.policies import SansIOHTTPPolicy
 from typing import Any, TypeVar
 
@@ -28,7 +28,7 @@ class DistributedTracer(SansIOHTTPPolicy):
         parent_span = tracing_context.get_current_span()  # type: AbstractSpan
 
         if parent_span is None:
-            parent_span = AzureSpan(name="parent_of_{}".format(self.name_of_child_span))
+            return
 
         child = parent_span.span(name=self.name_of_child_span)
         child.start()
