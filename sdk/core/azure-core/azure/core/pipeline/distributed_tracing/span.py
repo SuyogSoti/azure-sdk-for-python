@@ -77,7 +77,7 @@ class AbstractSpan(Protocol):
         pass
 
 
-class AzureSpan():
+class AzureSpan:
     def __init__(self, name="span"):
         # type: (str) -> None
         self.span_id = str(randint(1000000, 10000000)) + "-" + str(time.time())
@@ -127,12 +127,17 @@ class OpenCensusSpan:
     def __init__(self, span):
         # type: (Any) -> None
         self.span_instance = span
+        self.trace_id = None
+        if span.context_tracer:
+            self.trace_id = span.context_tracer.trace_id
         self.span_id = str(span.span_id)
 
     def span(self, name="child_span"):
         # type: (str) -> OpenCensusSpan
         child = self.span_instance.span(name=name)
-        return OpenCensusSpan(child)
+        wrapped_child = OpenCensusSpan(child)
+        wrapped_child.trace_id = self.trace_id
+        return wrapped_child
 
     def start(self):
         # type: () -> None
@@ -151,16 +156,16 @@ class OpenCensusSpan:
         self.span_instance.add_annotation(ann, **attrs)
 
     def to_header(self):
-        # type: () -> bytes
-        return str(vars(self.span_instance))
+        # type: () -> str
+        return "{},{}".format(self.span_id, self.trace_id)
 
 
 class DataDogSpan:
-
     def __init__(self, span):
         # type: (Any) -> None
         self.span_instance = span
         self.span_id = str(span.span_id)
+        self.trace_id = span.trace_id
 
     def span(self, name="child_span"):
         # type: (str) -> DataDogSpan
@@ -184,7 +189,5 @@ class DataDogSpan:
         pass
 
     def to_header(self):
-        # type: () -> bytes
-        props = dir(self.span_instance)
-        string = str([getattr(self.span_instance, prop, None) for prop in props])
-        return string
+        # type: () -> str
+        return "{},{}".format(self.span_id, self.trace_id)

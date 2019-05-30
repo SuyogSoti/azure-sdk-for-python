@@ -9,11 +9,13 @@ HTTPRequestType = TypeVar("HTTPRequestType")
 
 
 class DistributedTracer(SansIOHTTPPolicy):
+    """The policy to create spans for Azure Calls"""
+
     def __init__(
-            self,
-            name_of_spans="Azure Call",
-            header_label="span_id",
-            parent_span_param_name="parent_span",
+        self,
+        name_of_spans="Azure Call",
+        header_label="distributed_tracing_propagator",
+        parent_span_param_name="parent_span",
     ):
         # type: (str, str, str) -> None
         self.name_of_child_span = name_of_spans
