@@ -1,6 +1,6 @@
 import threading
 
-from azure.core.pipeline.distributed_tracing.span import AbstractSpan
+from azure.core.trace.span import AbstractSpan
 
 
 class TracingContext:

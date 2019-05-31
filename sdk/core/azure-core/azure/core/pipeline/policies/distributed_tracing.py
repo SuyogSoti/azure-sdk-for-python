@@ -1,6 +1,6 @@
 from azure.core.pipeline import PipelineRequest, PipelineResponse
-from azure.core.pipeline.distributed_tracing.context import tracing_context
-from azure.core.pipeline.distributed_tracing.span import AbstractSpan
+from azure.core.trace.context import tracing_context
+from azure.core.trace.span import AbstractSpan
 from azure.core.pipeline.policies import SansIOHTTPPolicy
 from typing import Any, TypeVar
 

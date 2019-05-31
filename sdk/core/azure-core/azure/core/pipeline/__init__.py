@@ -117,14 +117,13 @@ class PipelineResponse(object):
         self.context = context
 
 
-from .base import Pipeline, use_distributed_traces #pylint: disable=wrong-import-position
+from .base import Pipeline  #pylint: disable=wrong-import-position
 
 __all__ = [
     'Pipeline',
     'PipelineRequest',
     'PipelineResponse',
-    'PipelineContext',
-    'use_distributed_traces'
+    'PipelineContext'
 ]
 
 try:
