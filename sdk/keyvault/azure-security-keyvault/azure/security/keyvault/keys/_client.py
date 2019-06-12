@@ -7,13 +7,7 @@ from typing import Any, Dict, Generator, Mapping, Optional, List
 from datetime import datetime
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
-<<<<<<< HEAD
-from azure.core.pipeline import Pipeline
-from azure.core.pipeline.transport import RequestsTransport
-from azure.security.keyvault._internal import _BearerTokenCredentialPolicy
 from azure.core.trace import use_distributed_traces
-=======
->>>>>>> 788c79503c3f0d8b99eaca7ac8caa8c1523020a2
 
 from .._internal import _KeyVaultClientBase
 from ._models import Key, KeyBase, DeletedKey, KeyOperationResult
@@ -32,53 +26,7 @@ class KeyClient(_KeyVaultClientBase):
 
     # pylint:disable=protected-access
 
-<<<<<<< HEAD
-    @staticmethod
     @use_distributed_traces
-    def create_config(**kwargs):
-        pass  # TODO
-
-    @use_distributed_traces
-    def __init__(self, vault_url, credentials, config=None, api_version=None, **kwargs):
-        # type: (str, Any, Configuration, Optional[str], Mapping[str, Any]) -> None
-        # TODO: update type hint for credentials
-        if not credentials:
-            raise ValueError("credentials")
-
-        if not vault_url:
-            raise ValueError("vault_url")
-
-        self._vault_url = vault_url
-
-        if api_version is None:
-            api_version = KeyVaultClient.DEFAULT_API_VERSION
-
-        config = config or KeyVaultClient.get_configuration_class(api_version)(credentials)
-
-        # TODO generated default pipeline should be fine when token policy isn't necessary
-        policies = [
-            config.headers_policy,
-            config.user_agent_policy,
-            config.proxy_policy,
-            _BearerTokenCredentialPolicy(credentials),
-            config.redirect_policy,
-            config.retry_policy,
-            config.logging_policy,
-        ]
-        transport = RequestsTransport(config)
-        pipeline = Pipeline(transport, policies=policies)
-
-        self._client = KeyVaultClient(credentials, api_version=api_version, pipeline=pipeline)
-
-    @property
-    @use_distributed_traces
-    def vault_url(self):
-        # type: () -> str
-        return self._vault_url
-
-    @use_distributed_traces
-=======
->>>>>>> 788c79503c3f0d8b99eaca7ac8caa8c1523020a2
     def create_key(
         self,
         name,
