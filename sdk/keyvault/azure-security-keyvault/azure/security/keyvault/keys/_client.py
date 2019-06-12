@@ -7,13 +7,9 @@ from typing import Any, Dict, Generator, Mapping, Optional, List
 from datetime import datetime
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
-<<<<<<< HEAD
 from azure.core.pipeline import Pipeline
 from azure.core.pipeline.transport import RequestsTransport
-from azure.security.keyvault._internal import _BearerTokenCredentialPolicy
 from azure.core.trace import use_distributed_traces
-=======
->>>>>>> 788c79503c3f0d8b99eaca7ac8caa8c1523020a2
 
 from .._internal import _KeyVaultClientBase
 from ._models import Key, KeyBase, DeletedKey, KeyOperationResult
@@ -32,7 +28,6 @@ class KeyClient(_KeyVaultClientBase):
 
     # pylint:disable=protected-access
 
-<<<<<<< HEAD
     @staticmethod
     @use_distributed_traces
     def create_config(**kwargs):
@@ -77,8 +72,6 @@ class KeyClient(_KeyVaultClientBase):
         return self._vault_url
 
     @use_distributed_traces
-=======
->>>>>>> 788c79503c3f0d8b99eaca7ac8caa8c1523020a2
     def create_key(
         self,
         name,
