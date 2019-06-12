@@ -30,9 +30,9 @@ import logging
 import os
 import time
 try:
-    from urlparse import urlparse # type: ignore
+    from urlparse import urljoin, urlparse # type: ignore
 except ImportError:
-    from urllib.parse import urlparse
+    from urllib.parse import urljoin, urlparse
 import xml.etree.ElementTree as ET
 
 from typing import (TYPE_CHECKING, Generic, TypeVar, cast, IO, List, Union, Any, Mapping, Dict, # pylint: disable=unused-import
@@ -48,6 +48,7 @@ from azure.core.pipeline import ABC, AbstractContextManager, PipelineRequest, Pi
 
 HTTPResponseType = TypeVar("HTTPResponseType")
 HTTPRequestType = TypeVar("HTTPRequestType")
+PipelineType = TypeVar("PipelineType")
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -101,7 +102,9 @@ class HttpRequest(object):
     def query(self):
         """The query parameters of the request as a dict."""
         query = urlparse(self.url).query
-        return {p[0]: p[-1] for p in [p.partition('=') for p in query.split('&')]}
+        if query:
+            return {p[0]: p[-1] for p in [p.partition('=') for p in query.split('&')]}
+        return {}
 
     @property
     def body(self):
@@ -171,13 +174,13 @@ class HttpRequest(object):
             self.data = None
         else:
             bytes_data = ET.tostring(data, encoding="utf8")
-            self.headers['Content-Length'] = str(len(bytes_data))
-            self.data = bytes_data
+            self.data = bytes_data.replace(b"encoding='utf8'", b"encoding='utf-8'")
+            self.headers['Content-Length'] = str(len(self.data))
         self.files = None
 
     def set_json_body(self, data):
         """Set a JSON-friendly object as the body of the request.
-        
+
         :param data: The request field data.
         """
         if data is None:
@@ -205,7 +208,7 @@ class HttpRequest(object):
 
     def set_bytes_body(self, data):
         """Set generic bytes as the body of the request.
-        
+
         :param data: The request field data.
         """
         if data:
@@ -257,10 +260,227 @@ class _HttpResponseBase(object):
 
 
 class HttpResponse(_HttpResponseBase):
-    def stream_download(self):
-        # type: () -> Iterator[bytes]
+    def stream_download(self, pipeline):
+        # type: (PipelineType) -> Iterator[bytes]
         """Generator for streaming request body data.
 
         Should be implemented by sub-classes if streaming download
         is supported.
         """
+
+
+class PipelineClientBase(object):
+    """Base class for pipeline clients.
+
+    :param str base_url: URL for the request.
+    """
+
+    def __init__(self, base_url):
+        self._base_url = base_url
+
+    def _request(
+            self, method, # type: str
+            url, # type: str
+            params, # type: Optional[Dict[str, str]]
+            headers, # type: Optional[Dict[str, str]]
+            content, # type: Any
+            form_content, # type: Optional[Dict[str, Any]]
+            stream_content, # type: Any
+        ):
+        # type: (...) -> HttpRequest
+        """Create HttpRequest object.
+
+        :param str method: HTTP method (GET, HEAD, etc.)
+        :param str url: URL for the request.
+        :param dict params: URL query parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = HttpRequest(method, self.format_url(url))
+
+        if params:
+            request.format_parameters(params)
+
+        if headers:
+            request.headers.update(headers)
+
+        if content is not None:
+            if isinstance(content, ET.Element):
+                request.set_xml_body(content)
+            else:
+                try:
+                    request.set_json_body(content)
+                except TypeError:
+                    request.data = content
+
+        if form_content:
+            request.set_formdata_body(form_content)
+        elif stream_content:
+            request.set_streamed_data_body(stream_content)
+
+        return request
+
+    @staticmethod
+    def _format_url_section(template, **kwargs):
+        components = template.split("/")
+        while components:
+            try:
+                return template.format(**kwargs)
+            except KeyError as key:
+                formatted_components = template.split("/")
+                components = [c for c in formatted_components if "{{{}}}".format(key.args[0]) not in c]
+                template = "/".join(components)
+        # No URL sections left - returning None
+
+    def format_url(self, url_template, **kwargs):
+        # type: (str, Any) -> str
+        """Format request URL with the client base URL, unless the
+        supplied URL is already absolute.
+
+        :param str url_template: The request URL to be formatted if necessary.
+        """
+        url = self._format_url_section(url_template, **kwargs)
+        if url:
+            parsed = urlparse(url)
+            if not parsed.scheme or not parsed.netloc:
+                url = url.lstrip('/')
+                base = self._base_url.format(**kwargs).rstrip('/')
+                url = urljoin(base + '/', url)
+        else:
+            url = self._base_url.format(**kwargs)
+        return url
+
+    def get(
+            self, url, # type: str
+            params=None, # type: Optional[Dict[str, str]]
+            headers=None, # type: Optional[Dict[str, str]]
+            content=None, # type: Any
+            form_content=None # type: Optional[Dict[str, Any]]
+        ):
+        # type: (...) -> HttpRequest
+        """Create a GET request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('GET', url, params, headers, content, form_content, None)
+        request.method = 'GET'
+        return request
+
+    def put(
+            self, url, # type: str
+            params=None, # type: Optional[Dict[str, str]]
+            headers=None, # type: Optional[Dict[str, str]]
+            content=None, # type: Any
+            form_content=None, # type: Optional[Dict[str, Any]]
+            stream_content=None # type: Any
+        ):
+        # type: (...) -> HttpRequest
+        """Create a PUT request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('PUT', url, params, headers, content, form_content, stream_content)
+        return request
+
+    def post(
+            self, url, # type: str
+            params=None, # type: Optional[Dict[str, str]]
+            headers=None, # type: Optional[Dict[str, str]]
+            content=None, # type: Any
+            form_content=None, # type: Optional[Dict[str, Any]]
+            stream_content=None # type: Any
+        ):
+        # type: (...) -> HttpRequest
+        """Create a POST request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('POST', url, params, headers, content, form_content, stream_content)
+        return request
+
+    def head(
+            self, url, # type: str
+            params=None, # type: Optional[Dict[str, str]]
+            headers=None, # type: Optional[Dict[str, str]]
+            content=None, # type: Any
+            form_content=None, # type: Optional[Dict[str, Any]]
+            stream_content=None # type: Any
+        ):
+        # type: (...) -> HttpRequest
+        """Create a HEAD request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('HEAD', url, params, headers, content, form_content, stream_content)
+        return request
+
+    def patch(
+            self, url, # type: str
+            params=None, # type: Optional[Dict[str, str]]
+            headers=None, # type: Optional[Dict[str, str]]
+            content=None, # type: Any
+            form_content=None, # type: Optional[Dict[str, Any]]
+            stream_content=None # type: Any
+        ):
+        # type: (...) -> HttpRequest
+        """Create a PATCH request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('PATCH', url, params, headers, content, form_content, stream_content)
+        return request
+
+    def delete(self, url, params=None, headers=None, content=None, form_content=None):
+        # type: (str, Optional[Dict[str, str]], Optional[Dict[str, str]], Any, Optional[Dict[str, Any]]) -> HttpRequest
+        """Create a DELETE request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('DELETE', url, params, headers, content, form_content, None)
+        return request
+
+    def merge(self, url, params=None, headers=None, content=None, form_content=None):
+        # type: (str, Optional[Dict[str, str]], Optional[Dict[str, str]], Any, Optional[Dict[str, Any]]) -> HttpRequest
+        """Create a MERGE request object.
+
+        :param str url: The request URL.
+        :param dict params: Request URL parameters.
+        :param dict headers: Headers
+        :param dict form_content: Form content
+        :return: An HttpRequest object
+        :rtype: ~azure.core.pipeline.transport.HttpRequest
+        """
+        request = self._request('MERGE', url, params, headers, content, form_content, None)
+        return request
