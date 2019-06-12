@@ -1,4 +1,5 @@
 import unittest
+
 try:
     from unittest import mock
 except ImportError:
@@ -10,6 +11,12 @@ from azure.core.pipeline.policies.distributed_tracing import DistributedTracer
 from azure.core.pipeline.transport import HttpTransport
 from azure.core.trace import use_distributed_traces
 from azure.core.trace.context import tracing_context
+from azure.core.trace.span import DataDogSpan
+
+
+from opencensus.trace import tracer, Span
+from opencensus.trace.samplers import AlwaysOnSampler
+from ddtrace import tracer as dd_tracer
 
 
 class MockClient:
@@ -25,12 +32,22 @@ class MockClient:
 
         self.expected_response = mock.Mock(spec=PipelineResponse)
 
-    @use_distributed_traces
     def verify_request(self, request):
         current_span = tracing_context.get_current_span()
-        header = current_span.to_header()
-        if len(self.policies) > 1 and current_span is not None:
+        if (
+            len(self.policies) > 1
+            and current_span is not None
+            and len(current_span.children) > 0
+        ):
+            header = current_span.children[0].to_header({})
             dist_pol = self.policies[0]
+            print(request.http_request.headers)
+            header_label = ""
+            if current_span.impl_library is "opencensus":
+                header_label = "traceparent"
+            elif(current_span.impl_library is "datadog"):
+                header_label = "x-datadog-trace-id"
+            assert header_label in request.http_request.headers
             assert request.http_request.headers[dist_pol.header_label] == header
         return self.expected_response
 
@@ -48,92 +65,64 @@ class MockClient:
         return 5
 
 
-class ModelOpencensusSpan:
-    def __init__(self, name):
-        self.name = name
-        self.span_id = 0
-        self.children = []
-        self.attrs = {}
-        self.annotations = []
-        self.start_time = None
-        self.end_time = None
-        self.context_tracer = None
-
-    def span(self, name="child_span"):
-        child = ModelOpencensusSpan(name)
-        self.children.append(child)
-        return child
-
-    def add_attribute(self, attribute_key, attribute_value):
-        self.attrs[attribute_key] = attribute_value
-
-    def add_annotation(self, description, **attrs):
-        self.annotations.append(description)
-
-    def start(self):
-        self.start_time = 0
-
-    def finish(self):
-        self.end_time = 1
-
-
-class ModelDataDogSpan:
-    def __init__(self, name):
-        self.name = name
-        self.span_id = 0
-        self.attrs = {}
-        self.annotations = []
-        self.children = []
-        self.start_time = None
-        self.end_time = None
-        self.start = 0
-        self.trace_id = 0
-
-    class Tracer:
-        def start_span(self, name="", child_of=None):
-            child = ModelDataDogSpan(name)
-            if child_of is not None:
-                child_of.children.append(child)
-            return child
-
-    def tracer(self):
-        return self.Tracer()
-
-    def set_tag(self, attribute_key, attribute_value):
-        self.attrs[attribute_key] = attribute_value
-
-    def finish(self):
-        self.end_time = 1
-
-
 class TestUseDistributedTraces(unittest.TestCase):
     def test_use_distributed_traces_decorator(self):
         client = MockClient(policies=[])
-        parent = ModelOpencensusSpan("Overall")
+        parent = Span(name="Overall")
         client.get_foo(parent_span=parent, tracer="opencensus")
+        client.get_foo(parent_span=parent)
+        assert len(parent.children) == 2
+        assert len(parent.children[1].children) == 0
         assert parent.children[0].name == "MockClient.get_foo()"
         assert len(parent.children[0].children) == 0
 
-    def test_with_parent_span_with_opencensus(self):
+    def test_parent_span_with_opencensus(self):
+        trace = tracer.Tracer(sampler=AlwaysOnSampler())
+        parent = trace.start_span(name="OverAll")
         client = MockClient(policies=[DistributedTracer()])
-        parent = ModelOpencensusSpan("Overall")
         attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
         annotations = ["first Ann", "Second Ann"]
-        client.make_request(
-            2, parent_span=parent, tracer="opencensus"
-        )
-        assert len(parent.children[0].children) == 2
-        span = parent.children[0].children[0]
+        client.make_request(2)
+        client.make_request(2, tracer="opencensus")
+        client.make_request(2)
+        client.make_request(2, parent_span=parent, tracer="opencensus")
+        client.make_request(2)
+        client.make_request(2, tracer="opencensus")
+        client.make_request(2)
+        assert len(parent.children) == 3
+        assert parent.children[0].name == "MockClient.make_request(2)"
+        children = parent.children[0].children
+        assert len(children) == 3
         # TODO(suyogsoti)figure out a way to add annotations
+        # span = parent.children[0].children[0]
         # assert attrs == span.attrs
         # assert annotations == span.annotations
 
+    def get_children_of_datadog_span(self, parent, tracer):
+
+        traces = tracer.context_provider._local._locals.context._trace
+        return [x for x in traces if x.parent_id == parent.span_id]
+
     def test_with_parent_span_with_datadog(self):
         client = MockClient(policies=[DistributedTracer()])
-        parent = ModelDataDogSpan("Overall")
+        parent = dd_tracer.trace(name="Overall", service="suyog-azure-core-v0.01-datadog")
         attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
+        client.make_request(2)
+        client.make_request(2, tracer="datadog")
+        client.make_request(2)
         client.make_request(2, parent_span=parent, tracer="datadog")
-        assert len(parent.children[0].children) == 2
+        client.make_request(2)
+        client.make_request(2, tracer="datadog")
+        client.make_request(2)
+        chlds = self.get_children_of_datadog_span(parent, dd_tracer)
+        assert len(chlds) == 3
+        assert chlds[0].name == "MockClient.make_request(2)"
+        assert chlds[1].name == "MockClient.make_request(2)"
+        assert chlds[2].name == "MockClient.make_request(2)"
+        grandChlds = self.get_children_of_datadog_span(chlds[0], dd_tracer)
+        assert len(grandChlds) == 3
+        grandChlds = self.get_children_of_datadog_span(chlds[1], dd_tracer)
+        assert len(grandChlds) == 3
         # TODO(suyogsoti)figure out a way to add annotations
 
     def test_without_parent_span_with_tracing_policies(self):
@@ -143,9 +132,9 @@ class TestUseDistributedTraces(unittest.TestCase):
 
     def test_with_parent_span_without_tracing_policies(self):
         client = MockClient(policies=[])
-        parent = ModelOpencensusSpan("Overall")
+        parent = Span(name="Overall")
         client.make_request(2, parent_span=parent)
-        assert len(parent.children[0].children) == 1
+        assert len(parent.children[0].children) == 2
 
     def test_without_parent_span_without_tracing_policies(self):
         client = MockClient(policies=[])
