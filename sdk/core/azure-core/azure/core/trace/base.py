@@ -1,5 +1,6 @@
 import functools
 from os import environ
+import re
 
 from azure.core.trace.context import tracing_context
 from azure.core.trace.abstract_span import AbstractSpan
@@ -23,6 +24,7 @@ def use_distributed_traces(func):
 
         parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
         tracer_impl = kwargs.pop("tracer", None)  # type: str
+        black_list = kwargs.pop("blacklist", None)  # type: str
 
         if "azure_sdk_for_python_tracer" in environ:
             tracer_impl = environ["azure_sdk_for_python_tracer"]
@@ -43,8 +45,12 @@ def use_distributed_traces(func):
 
         ans = None
         tracing_context.set_current_span(parent_span)
-        only_propogate = tracing_context.should_only_propagate()
-        if parent_span is None or only_propogate:
+        only_propagate = tracing_context.should_only_propagate()
+        if (
+            parent_span is None
+            or only_propagate
+            or any([re.match(x, func.__name__) for x in black_list])
+        ):
             ans = func(self, *args, **kwargs)
         else:
             child = parent_span.span(name=name)
