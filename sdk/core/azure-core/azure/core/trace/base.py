@@ -60,7 +60,6 @@ def use_distributed_traces(func):
             tracing_context.set_current_span(child)
             ans = func(self, *args, **kwargs)
             child.finish()
-            # FIXME: This monkey patch is meh
             if getattr(parent_span, "was_created_by_azure_sdk", False):
                 parent_span.finish()
         tracing_context.set_current_span(orig_context)
