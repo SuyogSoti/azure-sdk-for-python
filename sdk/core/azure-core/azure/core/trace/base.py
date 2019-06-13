@@ -61,14 +61,8 @@ def use_distributed_traces(func):
             ans = func(self, *args, **kwargs)
             child.finish()
             # FIXME: This monkey patch is meh
-            if parent_span.was_created_by_azure_sdk:
-                old_del = getattr(self, "__del__", None)
-                old_type = type(self)
-                self.__class__ = type(
-                    old_type.__name__ + "_Override",
-                    (old_type,),
-                    delete_monkey_patcher(func=old_del, current_span=parent_span),
-                )
+            if getattr(parent_span, "was_created_by_azure_sdk", False):
+                parent_span.finish()
         tracing_context.set_current_span(orig_context)
         tracing_context.set_blacklist(context_black_list)
         return ans
