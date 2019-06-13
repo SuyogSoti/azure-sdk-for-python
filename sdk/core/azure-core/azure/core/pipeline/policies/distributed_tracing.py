@@ -15,12 +15,11 @@ class DistributedTracer(SansIOHTTPPolicy):
         self,
         name_of_spans="Azure Call",
         header_label="distributed_tracing_propagator",
-        parent_span_param_name="parent_span",
     ):
         # type: (str, str, str) -> None
         self.name_of_child_span = name_of_spans
         self.header_label = header_label
-        self.parent_span_param_name = parent_span_param_name
+        self.parent_span = None
         self.span_dict = {}
 
     def set_header(self, request, span):
@@ -44,9 +43,12 @@ class DistributedTracer(SansIOHTTPPolicy):
             self.set_header(request, parent_span)
             return
 
+        self.parent_span = parent_span
+
         child = parent_span.span(name=self.name_of_child_span)
         child.start()
 
+        tracing_context.set_current_span(child)  # type: AbstractSpan
         # child = self.attach_extra_information(child, request, **kwargs)
         self.set_header(request, child)
 
@@ -59,7 +61,7 @@ class DistributedTracer(SansIOHTTPPolicy):
             only_propagate = tracing_context.should_only_propagate()
             if span and not only_propagate:
                 span.finish()
-
+        tracing_context.set_current_span(self.parent_span)
         return span
 
     def on_response(self, request, response, **kwargs):

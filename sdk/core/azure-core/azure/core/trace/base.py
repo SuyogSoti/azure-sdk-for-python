@@ -24,7 +24,8 @@ def use_distributed_traces(func):
 
         parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
         tracer_impl = kwargs.pop("tracer", None)  # type: str
-        black_list = kwargs.pop("blacklist", None)  # type: str
+        context_black_list = tracing_context.get_blacklist()
+        black_list = kwargs.pop("blacklist", context_black_list)  # type: str
 
         if "azure_sdk_for_python_tracer" in environ:
             tracer_impl = environ["azure_sdk_for_python_tracer"]
@@ -45,6 +46,7 @@ def use_distributed_traces(func):
 
         ans = None
         tracing_context.set_current_span(parent_span)
+        tracing_context.set_blacklist(black_list)
         only_propagate = tracing_context.should_only_propagate()
         if (
             parent_span is None
@@ -68,6 +70,7 @@ def use_distributed_traces(func):
                     delete_monkey_patcher(func=old_del, current_span=parent_span),
                 )
         tracing_context.set_current_span(orig_context)
+        tracing_context.set_blacklist(context_black_list)
         return ans
 
     return wrapper_use_tracer

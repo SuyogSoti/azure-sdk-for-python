@@ -41,7 +41,6 @@ class MockClient:
         ):
             header = current_span.children[0].to_header({})
             dist_pol = self.policies[0]
-            print(request.http_request.headers)
             header_label = ""
             if current_span.impl_library is "opencensus":
                 header_label = "traceparent"
@@ -72,9 +71,9 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.get_foo(parent_span=parent, tracer="opencensus")
         client.get_foo(parent_span=parent)
         assert len(parent.children) == 2
-        assert len(parent.children[1].children) == 0
+        assert not parent.children[1].children
         assert parent.children[0].name == "MockClient.get_foo()"
-        assert len(parent.children[0].children) == 0
+        assert not parent.children[0].children
 
     def test_parent_span_with_opencensus(self):
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
@@ -110,8 +109,13 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.make_request(2)
         client.make_request(2, tracer="datadog")
         client.make_request(2)
+        chlds = self.get_children_of_datadog_span(parent, dd_tracer)
+        assert len(chlds) == 1
         client.make_request(2, parent_span=parent, tracer="datadog")
         client.make_request(2)
+        chlds = self.get_children_of_datadog_span(parent, dd_tracer)
+        assert len(chlds) == 2
+        print("===============================================")
         client.make_request(2, tracer="datadog")
         client.make_request(2)
         chlds = self.get_children_of_datadog_span(parent, dd_tracer)
@@ -124,6 +128,16 @@ class TestUseDistributedTraces(unittest.TestCase):
         grandChlds = self.get_children_of_datadog_span(chlds[1], dd_tracer)
         assert len(grandChlds) == 3
         # TODO(suyogsoti)figure out a way to add annotations
+
+    def test_blacklist_works(self):
+        trace = tracer.Tracer(sampler=AlwaysOnSampler())
+        parent = trace.start_span(name="OverAll")
+        client = MockClient(policies=[DistributedTracer()])
+        client.make_request(2, tracer="opencensus")
+        assert len(parent.children) == 1
+        print("=====================")
+        client.make_request(2, tracer="opencensus", blacklist=["make_request"])
+        assert len(parent.children) == 5
 
     def test_without_parent_span_with_tracing_policies(self):
         client = MockClient(policies=[DistributedTracer()])

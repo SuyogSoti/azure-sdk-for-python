@@ -81,7 +81,7 @@ class OpenCensusSpan:
         if tracer_from_context is not None:
             ctx = copy.deepcopy(tracer_from_context.span_context)
             ctx.span_id = self.span_id
-            header = "{}-{}".format(ctx.trace_id, ctx.span_id)
+            header = "{}-{}".format(ctx.span_id, ctx.trace_id)
             tempDict = tracer_from_context.propagator.to_headers(ctx)
             for key in tempDict:
                 headers[key] = tempDict[key]

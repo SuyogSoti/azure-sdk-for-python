@@ -1,5 +1,6 @@
 import threading
 from os import environ
+from typing import List
 
 from azure.core.trace.abstract_span import AbstractSpan
 
@@ -13,6 +14,8 @@ class TracingContext:
             self.data.current_span = None
         with self.lock:
             self.data.tracer = None
+        with self.lock:
+            self.data.blacklist = []
 
     def set_current_span(self, current_span):
         # type: (AbstractSpan) -> None
@@ -37,6 +40,15 @@ class TracingContext:
         # type: (AbstractSpan) -> None
         with self.lock:
             self.data.tracer = tracer
+
+    def set_blacklist(self, blacklist):
+        # type: (List[str]) -> None
+        with self.lock:
+            self.data.blacklist = blacklist
+
+    def get_blacklist(self):
+        # type: () -> List[str]
+        return getattr(self.data, "blacklist", [])
 
 
 tracing_context = TracingContext()
