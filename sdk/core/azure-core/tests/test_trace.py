@@ -1,5 +1,5 @@
 import unittest
-
+import pytest
 try:
     from unittest import mock
 except ImportError:
@@ -102,6 +102,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         traces = tracer.context_provider._local._locals.context._trace
         return [x for x in traces if x.parent_id == parent.span_id]
 
+    @pytest.mark.skip("Datadog isssue: https://github.com/DataDog/dd-trace-py/issues/968")
     def test_with_parent_span_with_datadog(self):
         client = MockClient(policies=[DistributedTracer()])
         parent = dd_tracer.trace(name="Overall", service="suyog-azure-core-v0.01-datadog")
@@ -115,7 +116,6 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.make_request(2)
         chlds = self.get_children_of_datadog_span(parent, dd_tracer)
         assert len(chlds) == 2
-        print("===============================================")
         client.make_request(2, tracer="datadog")
         client.make_request(2)
         chlds = self.get_children_of_datadog_span(parent, dd_tracer)
