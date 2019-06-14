@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, List
 from typing_extensions import Protocol
 
 
@@ -19,7 +19,12 @@ class AbstractSpan(Protocol):
 
     @property
     def children(self):
-        # type: () -> int
+        # type: () -> List[AbstractSpan]
+        pass
+
+    @property
+    def span_instance(self):
+        # type: () -> Any
         pass
 
     def span(self, name="child_span"):
