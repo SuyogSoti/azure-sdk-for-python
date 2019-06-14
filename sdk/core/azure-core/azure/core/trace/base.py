@@ -13,14 +13,7 @@ def use_distributed_traces(func):
     def wrapper_use_tracer(self, *args, **kwargs):
         # type: (Any) -> Any
 
-        name = (
-            self.__class__.__name__
-            + "."
-            + func.__name__
-            + "("
-            + ", ".join([str(i) for i in args])
-            + ")"
-        )
+        name = self.__class__.__name__ + "." + func.__name__
 
         parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
         tracer_impl = kwargs.pop("tracer", None)  # type: str
@@ -67,17 +60,3 @@ def use_distributed_traces(func):
         return ans
 
     return wrapper_use_tracer
-
-
-def delete_monkey_patcher(func, current_span):
-    # type: (Callable[[Any], Any]) -> Callable[[Any], Any]
-    @functools.wraps(func)
-    def wrapper_end_tracer(self, *args, **kwargs):
-        ans = None
-        if func is not None:
-            ans = func(self, *args, **kwargs)
-        tracer = tracing_context.get_azure_created_tracer()
-        current_span.end_tracer(tracer)
-        return ans
-
-    return {"__del__": wrapper_end_tracer}

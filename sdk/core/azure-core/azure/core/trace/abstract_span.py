@@ -38,41 +38,6 @@ class AbstractSpan(Protocol):
          """
         pass
 
-    def add_attribute(self, attribute_key, attribute_value):
-        # type: (str, str) -> None
-        """Add attribute to span.
-
-        :type attribute_key: str
-
-        :param attribute_key: Attribute key.
-
-
-
-        :type attribute_value:str
-
-        :param attribute_value: Attribute value.
-
-        """
-        pass
-
-    def add_annotation(self, description, **attrs):
-        # type: (str, Any) -> None
-        """Add an annotation to span.
-
-        :type description: str
-
-        :param description: A user-supplied message describing the event.
-
-                        The maximum length for the description is 256 bytes.
-
-
-        :type attrs: kwargs
-
-        :param attrs: keyworded arguments e.g. failed=True, name='Caching'
-
-        """
-        pass
-
     def start(self):
         # type: () -> None
         """Set the start time for a span."""
