@@ -77,7 +77,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.get_foo(parent_span=parent)
         assert len(parent.children) == 2
         assert not parent.children[1].children
-        assert parent.children[0].name == "MockClient.get_foo()"
+        assert parent.children[0].name == "MockClient.get_foo"
         assert not parent.children[0].children
         parent.finish()
 
@@ -95,7 +95,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.make_request(2, tracer="opencensus")
         client.make_request(2)
         assert len(parent.children) == 3
-        assert parent.children[0].name == "MockClient.make_request(2)"
+        assert parent.children[0].name == "MockClient.make_request"
         children = parent.children[0].children
         assert len(children) == 3
         # TODO(suyogsoti)figure out a way to add annotations
@@ -132,9 +132,9 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.make_request(2)
         chlds = self.get_children_of_datadog_span(parent, dd_tracer)
         assert len(chlds) == 3
-        assert chlds[0].name == "MockClient.make_request(2)"
-        assert chlds[1].name == "MockClient.make_request(2)"
-        assert chlds[2].name == "MockClient.make_request(2)"
+        assert chlds[0].name == "MockClient.make_request"
+        assert chlds[1].name == "MockClient.make_request"
+        assert chlds[2].name == "MockClient.make_request"
         grandChlds = self.get_children_of_datadog_span(chlds[0], dd_tracer)
         assert len(grandChlds) == 3
         grandChlds = self.get_children_of_datadog_span(chlds[1], dd_tracer)
