@@ -1,3 +1,4 @@
+import argparse
 import ast
 import importlib
 import inspect
@@ -9,7 +10,7 @@ import sys
 import shutil
 from pathlib import Path
 
-from typing import List, Tuple, Any
+from typing import List, Tuple, Any, Union
 
 try:
     import msrestazure
@@ -42,8 +43,6 @@ except:
 import pkg_resources
 
 pkg_resources.declare_namespace("azure")
-
-_GENERATE_MARKER = "############ Generated from here ############\n"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -278,6 +277,84 @@ def build_operation_mixin_meta(versioned_modules):
     return mixin_operations
 
 
+def build_last_rt_list(
+    versioned_operations_dict, mixin_operations, last_api_version, preview_mode
+):
+    """Build the a mapping RT => API version if RT doesn't exist in latest detected API version.
+
+    Example:
+    last_rt_list = {
+       'check_dns_name_availability': '2018-05-01'
+    }
+
+    There is one subtle scenario if PREVIEW mode is disabled:
+    - RT1 available on 2019-05-01 and 2019-06-01-preview
+    - RT2 available on 2019-06-01-preview
+    - RT3 available on 2019-07-01-preview
+
+    Then, if I put "RT2: 2019-06-01-preview" in the list, this means I have to make
+    "2019-06-01-preview" the default for models loading (otherwise "RT2: 2019-06-01-preview" won't work).
+    But this likely breaks RT1 default operations at "2019-05-01", with default models at "2019-06-01-preview"
+    since "models" are shared for the entire set of operations groups (I wished models would be split by operation groups, but meh, that's not the case)
+
+    So, until we have a smarter Autorest to deal with that, only preview RTs which do not share models with a stable RT can be added to this map.
+    In this case, RT2 is out, RT3 is in.
+    """
+
+    def there_is_a_rt_that_contains_api_version(rt_dict, api_version):
+        "Test in the given api_version is is one of those RT."
+        for rt_api_version in rt_dict.values():
+            if api_version in rt_api_version:
+                return True
+        return False
+
+    last_rt_list = {}
+    # Operation groups
+    versioned_dict = {
+        operation_name: [meta[0] for meta in operation_metadata]
+        for operation_name, operation_metadata in versioned_operations_dict.items()
+    }
+    # Operations at client level
+    versioned_dict.update(
+        {
+            operation_name: operation_metadata["available_apis"]
+            for operation_name, operation_metadata in mixin_operations.items()
+        }
+    )
+
+    for operation, api_versions_list in versioned_dict.items():
+        local_last_api_version = get_floating_latest(api_versions_list, preview_mode)
+        if local_last_api_version == last_api_version:
+            continue
+        # If some others RT contains "local_last_api_version", and it's greater than the future default, danger, don't profile it
+        if there_is_a_rt_that_contains_api_version(versioned_dict, local_last_api_version) and local_last_api_version > last_api_version:
+            continue
+        last_rt_list[operation] = local_last_api_version
+
+    return last_rt_list
+
+
+def get_floating_latest(api_versions_list, preview_mode):
+    """Get the floating latest, from a random list of API versions.
+    """
+    api_versions_list = list(api_versions_list)
+    absolute_latest = sorted(api_versions_list)[-1]
+    trimmed_preview = [
+        version for version in api_versions_list if "preview" not in version
+    ]
+
+    # If there is no preview, easy: the absolute latest is the only latest
+    if not trimmed_preview:
+        return absolute_latest
+
+    # If preview mode, let's use the absolute latest, I don't care preview or stable
+    if preview_mode:
+        return absolute_latest
+
+    # If not preview mode, and there is preview, take the latest known stable
+    return sorted(trimmed_preview)[-1]
+
+
 def find_module_folder(package_name, module_name):
     sdk_root = Path(__file__).parents[1]
     _LOGGER.debug("SDK root is: %s", sdk_root)
@@ -294,7 +371,38 @@ def find_client_file(package_name, module_name):
     return next(module_path.glob("*_client.py"))
 
 
-def main(input_str):
+def patch_import(file_path: Union[str, Path]) -> None:
+    """If multi-client package, we need to patch import to be
+    from ..version
+    and not
+    from .version
+
+    That should probably means those files should become a template, but since right now
+    it's literally one dot, let's do it the raw way.
+    """
+    # That's a dirty hack, maybe it's worth making configuration a template?
+    with open(file_path, "rb") as read_fd:
+        conf_bytes: bytes = read_fd.read()
+    conf_bytes = conf_bytes.replace(
+        b" .version", b" ..version"
+    )  # Just a dot right? Worth its own template for that? :)
+    with open(file_path, "wb") as write_fd:
+        write_fd.write(conf_bytes)
+
+
+def has_subscription_id(client_class):
+    return "subscription_id" in inspect.signature(client_class).parameters
+
+
+def main(input_str, default_api=None):
+
+    # If True, means the auto-profile will consider preview versions.
+    # If not, if it exists a stable API version for a global or RT, will always be used
+    preview_mode = default_api and "preview" in default_api
+
+    # The only known multi-client package right now is azure-mgmt-resource
+    is_multi_client_package = "#" in input_str
+
     package_name, module_name = parse_input(input_str)
     versioned_modules = get_versioned_modules(package_name, module_name)
     versioned_operations_dict, mod_to_api_version = build_operation_meta(
@@ -302,10 +410,15 @@ def main(input_str):
     )
 
     client_folder = find_module_folder(package_name, module_name)
-    last_api_version = sorted(mod_to_api_version.keys())[-1]
-    last_api_path = client_folder / last_api_version
+    last_api_version = get_floating_latest(mod_to_api_version.keys(), preview_mode)
 
-    _LOGGER.info("Copy _configuration.py if possible")
+    # I need default_api to be v2019_06_07_preview shaped if it exists, let's be smart
+    # and change it automatically so I can take both syntax as input
+    if default_api and not default_api.startswith("v"):
+        last_api_version = [mod_api for mod_api, real_api in mod_to_api_version.items() if real_api == default_api][0]
+        _LOGGER.info("Default API version will be: %s", last_api_version)
+
+    last_api_path = client_folder / last_api_version
 
     shutil.copy(
         client_folder / last_api_version / "_configuration.py",
@@ -314,6 +427,10 @@ def main(input_str):
     shutil.copy(
         client_folder / last_api_version / "__init__.py", client_folder / "__init__.py"
     )
+    if is_multi_client_package:
+        _LOGGER.warning("Patching multi-api client basic files")
+        patch_import(client_folder / "_configuration.py")
+        patch_import(client_folder / "__init__.py")
 
     versionned_mod = versioned_modules[last_api_version]
     client_name = get_client_class_name_from_module(versionned_mod)
@@ -342,23 +459,20 @@ def main(input_str):
     #         ]
     #     }
     # }
+    # last_rt_list = {
+    #    'check_dns_name_availability': '2018-05-01'
+    # }
 
-    last_rt_list = {}
-    for operation, operation_metadata in versioned_operations_dict.items():
-        local_last_api_version = sorted(operation_metadata)[-1][0]
-        if local_last_api_version == last_api_version:
-            continue
-        last_rt_list[operation] = mod_to_api_version[local_last_api_version]
-
-    for operation, operation_metadata in mixin_operations.items():
-        local_last_api_version = sorted(operation_metadata['available_apis'])[-1]
-        if local_last_api_version == last_api_version:
-            continue
-        last_rt_list[operation] = mod_to_api_version[local_last_api_version]
+    last_rt_list = build_last_rt_list(
+        versioned_operations_dict,
+        mixin_operations,
+        last_api_version,
+        preview_mode
+    )
 
     conf = {
-        "api_version_modules": sorted(mod_to_api_version.keys()),
         "client_name": client_name,
+        "has_subscription_id": has_subscription_id(client_class),
         "module_name": module_name,
         "operations": versioned_operations_dict,
         "mixin_operations": mixin_operations,
@@ -366,6 +480,7 @@ def main(input_str):
         "last_api_version": mod_to_api_version[last_api_version],
         "client_doc": client_class.__doc__.split("\n")[0],
         "last_rt_list": last_rt_list,
+        "default_models": sorted({last_api_version} | {versions for _, versions in last_rt_list.items()})
     }
 
     env = Environment(
@@ -394,5 +509,21 @@ def main(input_str):
 
 
 if __name__ == "__main__":
-    logging.basicConfig(level=logging.INFO)
-    main(sys.argv[1])
+    parser = argparse.ArgumentParser(
+        description='Multi-API client generation for Azure SDK for Python',
+    )
+    parser.add_argument("--debug",
+                        dest="debug", action="store_true",
+                        help="Verbosity in DEBUG mode")
+    parser.add_argument('--default-api-version',
+                        dest='default_api', default=None,
+                        help='Force default API version, do not detect it. [default: %(default)s]')
+    parser.add_argument('package_name', help='The package name.')
+
+    args = parser.parse_args()
+
+    main_logger = logging.getLogger()
+    logging.basicConfig()
+    main_logger.setLevel(logging.DEBUG if args.debug else logging.INFO)
+
+    main(args.package_name, default_api=args.default_api)
