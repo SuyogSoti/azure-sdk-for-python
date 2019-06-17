@@ -106,7 +106,6 @@ class TestUseDistributedTraces(unittest.TestCase):
         trace.end_span()
 
     def get_children_of_datadog_span(self, parent, tracer):
-
         traces = tracer.context_provider._local._locals.context._trace
         return [x for x in traces if x.parent_id == parent.span_id]
 
@@ -144,9 +143,13 @@ class TestUseDistributedTraces(unittest.TestCase):
 
     def test_trace_with_not_setup(self):
         with pytest.raises(AssertionError):
-            client = MockClient(policies=[DistributedTracer()], assert_current_span=True)
+            client = MockClient(
+                policies=[DistributedTracer()], assert_current_span=True
+            )
             client.make_request(2)
-        os_env = mock.patch.dict(os.environ, {"azure_sdk_for_python_tracer": "opencensus"})
+        os_env = mock.patch.dict(
+            os.environ, {"azure_sdk_for_python_tracer": "opencensus"}
+        )
         os_env.start()
         client = MockClient(policies=[DistributedTracer()], assert_current_span=True)
         client.make_request(2)
