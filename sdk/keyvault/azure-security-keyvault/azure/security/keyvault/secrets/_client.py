@@ -7,6 +7,7 @@ from typing import Any, Dict, Generator, Mapping, Optional
 from datetime import datetime
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.core.trace import use_distributed_traces
 
 from .._internal import _KeyVaultClientBase
 from ._models import Secret, DeletedSecret, SecretAttributes
@@ -25,6 +26,7 @@ class SecretClient(_KeyVaultClientBase):
 
     # pylint:disable=protected-access
 
+    @use_distributed_traces
     def get_secret(self, name, version=None, **kwargs):
         # type: (str, str, Mapping[str, Any]) -> Secret
         """Get a specified secret from the vault.
@@ -49,6 +51,7 @@ class SecretClient(_KeyVaultClientBase):
         bundle = self._client.get_secret(self._vault_url, name, version or "", error_map={404: ResourceNotFoundError})
         return Secret._from_secret_bundle(bundle)
 
+    @use_distributed_traces
     def set_secret(
         self, name, value, content_type=None, enabled=None, not_before=None, expires=None, tags=None, **kwargs
     ):
@@ -91,6 +94,7 @@ class SecretClient(_KeyVaultClientBase):
         )
         return Secret._from_secret_bundle(bundle)
 
+    @use_distributed_traces
     def update_secret(
         self, name, version=None, content_type=None, enabled=None, not_before=None, expires=None, tags=None, **kwargs
     ):
@@ -139,6 +143,7 @@ class SecretClient(_KeyVaultClientBase):
         )
         return SecretAttributes._from_secret_bundle(bundle)  # pylint: disable=protected-access
 
+    @use_distributed_traces
     def list_secrets(self, **kwargs):
         # type: (Mapping[str, Any]) -> Generator[SecretAttributes]
         """List secrets in the vault.
@@ -164,6 +169,7 @@ class SecretClient(_KeyVaultClientBase):
         pages = self._client.get_secrets(self._vault_url, maxresults=max_page_size)
         return (SecretAttributes._from_secret_item(item) for item in pages)
 
+    @use_distributed_traces
     def list_secret_versions(self, name, **kwargs):
         # type: (str, Mapping[str, Any]) -> Generator[SecretAttributes]
         """List all versions of the specified secret.
@@ -189,6 +195,7 @@ class SecretClient(_KeyVaultClientBase):
         pages = self._client.get_secret_versions(self._vault_url, name, maxresults=max_page_size)
         return (SecretAttributes._from_secret_item(item) for item in pages)
 
+    @use_distributed_traces
     def backup_secret(self, name, **kwargs):
         # type: (str, Mapping[str, Any]) -> bytes
         """Backs up the specified secret.
@@ -213,6 +220,7 @@ class SecretClient(_KeyVaultClientBase):
         backup_result = self._client.backup_secret(self.vault_url, name, error_map={404: ResourceNotFoundError})
         return backup_result.value
 
+    @use_distributed_traces
     def restore_secret(self, backup, **kwargs):
         # type: (bytes, Mapping[str, Any]) -> SecretAttributes
         """Restore a backed up secret to the vault.
@@ -236,6 +244,7 @@ class SecretClient(_KeyVaultClientBase):
         bundle = self._client.restore_secret(self.vault_url, backup, error_map={409: ResourceExistsError})
         return SecretAttributes._from_secret_bundle(bundle)
 
+    @use_distributed_traces
     def delete_secret(self, name, **kwargs):
         # type: (str, Mapping[str, Any]) -> DeletedSecret
         """Deletes a secret from the vault.
@@ -260,6 +269,7 @@ class SecretClient(_KeyVaultClientBase):
         bundle = self._client.delete_secret(self.vault_url, name, error_map={404: ResourceNotFoundError})
         return DeletedSecret._from_deleted_secret_bundle(bundle)
 
+    @use_distributed_traces
     def get_deleted_secret(self, name, **kwargs):
         # type: (str, Mapping[str, Any]) -> DeletedSecret
         """Gets the specified deleted secret.
@@ -283,6 +293,7 @@ class SecretClient(_KeyVaultClientBase):
         bundle = self._client.get_deleted_secret(self.vault_url, name, error_map={404: ResourceNotFoundError})
         return DeletedSecret._from_deleted_secret_bundle(bundle)
 
+    @use_distributed_traces
     def list_deleted_secrets(self, **kwargs):
         # type: (Mapping[str, Any]) -> Generator[DeletedSecret]
         """Lists deleted secrets of the vault.
@@ -307,6 +318,7 @@ class SecretClient(_KeyVaultClientBase):
         pages = self._client.get_deleted_secrets(self._vault_url, maxresults=max_page_size)
         return (SecretAttributes._from_secret_item(item) for item in pages)
 
+    @use_distributed_traces
     def purge_deleted_secret(self, name, **kwargs):
         # type: (str, Mapping[str, Any]) -> None
         """Permanently deletes the specified secret.
@@ -329,6 +341,7 @@ class SecretClient(_KeyVaultClientBase):
         """
         self._client.purge_deleted_secret(self.vault_url, name)
 
+    @use_distributed_traces
     def recover_deleted_secret(self, name, **kwargs):
         # type: (str, Mapping[str, Any]) -> SecretAttributes
         """Recovers the deleted secret to the latest version.

@@ -10,6 +10,7 @@
 # --------------------------------------------------------------------------
 from azure.profiles import KnownProfiles, ProfileDefinition
 from azure.profiles.multiapiclient import MultiApiClientMixin
+from azure.core.trace import use_distributed_traces
 
 from .v7_0.version import VERSION as V7_0_VERSION
 from .v2016_10_01.version import VERSION as V2016_10_01_VERSION
@@ -34,11 +35,21 @@ class KeyVaultClient(MultiApiClientMixin):
 
     DEFAULT_API_VERSION = "7.0"
     _PROFILE_TAG = "azure.keyvault.KeyVaultClient"
-    LATEST_PROFILE = ProfileDefinition({_PROFILE_TAG: {None: DEFAULT_API_VERSION}}, _PROFILE_TAG + " latest")
+    LATEST_PROFILE = ProfileDefinition(
+        {_PROFILE_TAG: {None: DEFAULT_API_VERSION}}, _PROFILE_TAG + " latest"
+    )
 
     _init_complete = False
 
-    def __init__(self, credentials, pipeline=None, api_version=None, aio=False, profile=KnownProfiles.default):
+    @use_distributed_traces
+    def __init__(
+        self,
+        credentials,
+        pipeline=None,
+        api_version=None,
+        aio=False,
+        profile=KnownProfiles.default,
+    ):
         self._client_impls = {}
         self._pipeline = pipeline
         self._entered = False
@@ -49,6 +60,7 @@ class KeyVaultClient(MultiApiClientMixin):
         self._init_complete = True
 
     @staticmethod
+    @use_distributed_traces
     def get_configuration_class(api_version, aio=False):
         """
         Get the versioned configuration implementation corresponding to the current profile.
@@ -65,10 +77,13 @@ class KeyVaultClient(MultiApiClientMixin):
             else:
                 from .v2016_10_01 import KeyVaultClientConfiguration as ImplConfig
         else:
-            raise NotImplementedError("API version {} is not available".format(api_version))
+            raise NotImplementedError(
+                "API version {} is not available".format(api_version)
+            )
         return ImplConfig
 
     @property
+    @use_distributed_traces
     def models(self):
         """Module depends on the API version:
             * 2016-10-01: :mod:`v2016_10_01.models<azure.keyvault._generated.v2016_10_01.models>`
@@ -81,9 +96,12 @@ class KeyVaultClient(MultiApiClientMixin):
         elif api_version == V2016_10_01_VERSION:
             from .v2016_10_01 import models as impl_models
         else:
-            raise NotImplementedError("APIVersion {} is not available".format(api_version))
+            raise NotImplementedError(
+                "APIVersion {} is not available".format(api_version)
+            )
         return impl_models
 
+    @use_distributed_traces
     def _get_client_impl(self):
         """
         Get the versioned client implementation corresponding to the current profile.
@@ -94,6 +112,7 @@ class KeyVaultClient(MultiApiClientMixin):
             self._create_client_impl(api_version)
         return self._client_impls[api_version]
 
+    @use_distributed_traces
     def _create_client_impl(self, api_version):
         """
         Creates the client implementation corresponding to the specified api_version.
@@ -111,7 +130,9 @@ class KeyVaultClient(MultiApiClientMixin):
             else:
                 from .v2016_10_01 import KeyVaultClient as ImplClient
         else:
-            raise NotImplementedError("API version {} is not available".format(api_version))
+            raise NotImplementedError(
+                "API version {} is not available".format(api_version)
+            )
 
         impl = ImplClient(credentials=self._credentials, pipeline=self._pipeline)
 
@@ -125,6 +146,7 @@ class KeyVaultClient(MultiApiClientMixin):
         self._client_impls[api_version] = impl
         return impl
 
+    @use_distributed_traces
     def __aenter__(self, *args, **kwargs):
         """
         Calls __aenter__ on all client implementations which support it
@@ -141,6 +163,7 @@ class KeyVaultClient(MultiApiClientMixin):
         self._entered = True
         return self
 
+    @use_distributed_traces
     def __enter__(self, *args, **kwargs):
         """
         Calls __enter__ on all client implementations which support it
@@ -157,6 +180,7 @@ class KeyVaultClient(MultiApiClientMixin):
         self._entered = True
         return self
 
+    @use_distributed_traces
     def __aexit__(self, *args, **kwargs):
         """
         Calls __aexit__ on all client implementations which support it
@@ -169,6 +193,7 @@ class KeyVaultClient(MultiApiClientMixin):
                 impl.__aexit__(*args, **kwargs)
         return self
 
+    @use_distributed_traces
     def __exit__(self, *args, **kwargs):
         """
         Calls __exit__ on all client implementations which support it
@@ -181,6 +206,7 @@ class KeyVaultClient(MultiApiClientMixin):
                 impl.__exit__(*args, **kwargs)
         return self
 
+    @use_distributed_traces
     def __getattr__(self, name):
         """
         In the case that the attribute is not defined on the custom KeyVaultClient.  Attempt to get
@@ -191,6 +217,7 @@ class KeyVaultClient(MultiApiClientMixin):
         impl = self._get_client_impl()
         return getattr(impl, name)
 
+    @use_distributed_traces
     def __setattr__(self, name, attr):
         """
         Sets the specified attribute either on the custom KeyVaultClient or the current underlying implementation.
