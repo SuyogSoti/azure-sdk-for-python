@@ -83,8 +83,7 @@ class OpenCensusSpan:
             ctx.span_id = self.span_id
             header = "{}-{}".format(ctx.span_id, ctx.trace_id)
             tempDict = tracer_from_context.propagator.to_headers(ctx)
-            for key in tempDict:
-                headers[key] = tempDict[key]
+            headers.update(tempDict)
         return header
 
     def get_current_span_from_context(self):
