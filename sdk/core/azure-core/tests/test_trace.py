@@ -71,8 +71,9 @@ class MockClient:
 
 class TestUseDistributedTraces(unittest.TestCase):
     def test_use_distributed_traces_decorator(self):
+        trace = tracer.Tracer(sampler=AlwaysOnSampler())
+        parent = trace.start_span(name="OverAll")
         client = MockClient(policies=[])
-        parent = Span(name="Overall")
         client.get_foo(parent_span=parent, tracer="opencensus")
         client.get_foo(parent_span=parent)
         assert len(parent.children) == 2
@@ -80,6 +81,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         assert parent.children[0].name == "MockClient.get_foo"
         assert not parent.children[0].children
         parent.finish()
+        trace.finish()
 
     def test_parent_span_with_opencensus(self):
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
@@ -98,10 +100,6 @@ class TestUseDistributedTraces(unittest.TestCase):
         assert parent.children[0].name == "MockClient.make_request"
         children = parent.children[0].children
         assert len(children) == 3
-        # TODO(suyogsoti)figure out a way to add annotations
-        # span = parent.children[0].children[0]
-        # assert attrs == span.attrs
-        # assert annotations == span.annotations
         parent.finish()
         trace.end_span()
 

@@ -78,8 +78,8 @@ def use_distributed_traces_async(func):
     @functools.wraps(func)
     async def wrapper_use_tracer_async(self, *args, **kwargs):
         # type: (Any) -> Any
-        black_list, og_blacklist = get_blacklist(**kwargs)
-        parent_span, original_span_from_context = get_parent(**kwargs)
+        black_list, og_blacklist = get_blacklist(kwargs)
+        parent_span, original_span_from_context = get_parent(kwargs)
         ans = None
         if should_use_trace(parent_span, black_list, func.__name__):
             name = self.__class__.__name__ + "." + func.__name__
