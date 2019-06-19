@@ -45,9 +45,11 @@ def reset_context(og_blacklist, original_span_from_context):
 
 def should_use_trace(parent_span, black_list, name_of_func):
     only_propagate = tracing_context.should_only_propagate()
+    is_blacklisted = any([re.match(x, name_of_func) for x in black_list])
+    if is_blacklisted:
+        tracing_context.set_current_span(None)
     return not(
-        parent_span is None or only_propagate or any(
-            [re.match(x, name_of_func) for x in black_list]))
+        parent_span is None or only_propagate or is_blacklisted)
 
 def use_distributed_traces(func):
     # type: (Callable[[Any], Any]) -> Callable[[Any], Any]

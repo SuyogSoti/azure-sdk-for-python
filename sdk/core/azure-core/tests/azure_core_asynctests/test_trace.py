@@ -164,7 +164,12 @@ async def test_blacklist_works():
     await client.make_request(2, tracer="opencensus")
     assert len(parent.children) == 1
     await client.make_request(2, tracer="opencensus", blacklist=["make_request"])
-    assert len(parent.children) == 5
+    assert len(parent.children) == 1
+    await client.make_request(2, tracer="opencensus", blacklist=["get_foo"])
+    assert len(parent.children) == 2
+    assert len(parent.children[1].children) == 2
+    assert parent.children[1].children[0].name == "Azure Call"
+    assert parent.children[1].children[1].name == "MockClient.make_request"
     parent.finish()
     trace.end_span()
 
