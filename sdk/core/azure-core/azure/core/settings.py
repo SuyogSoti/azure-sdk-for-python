@@ -31,6 +31,7 @@
 from collections import namedtuple
 import logging
 import os
+import six
 from typing import Any, Union
 from azure.core.trace.span import OpenCensusSpan, DataDogSpan
 from azure.core.trace.abstract_span import AbstractSpan
@@ -60,9 +61,9 @@ def convert_bool(value):
 
     """
     if value in (True, False):
-        return value # type: ignore
+        return value  # type: ignore
 
-    val = value.lower() # type: ignore
+    val = value.lower()  # type: ignore
     if val in ["yes", "1", "on"]:
         return True
     if val in ["no", "0", "off"]:
@@ -99,9 +100,9 @@ def convert_logging(value):
 
     """
     if value in set(_levels.values()):
-        return value # type: ignore
+        return value  # type: ignore
 
-    val = value.upper() # type: ignore
+    val = value.upper()  # type: ignore
     level = _levels.get(val)
     if not level:
         raise ValueError(
@@ -111,7 +112,10 @@ def convert_logging(value):
         )
     return level
 
+
 _tracing_implementation = {"opencensus": OpenCensusSpan, "datadog": DataDogSpan}
+
+
 def convert_tracing_impl(value):
     # type: (Union[str, AbstractSpan]) -> AbstractSpan
     """Convert a string to a Distributed Tracing Implementation Wrapper
@@ -124,16 +128,19 @@ def convert_tracing_impl(value):
 
     :param value: the value to convert
     :type value: string
-    :returns: int
-    :raises ValueError: If conversion to the implementation wrapper fail
+    :returns: AbstractSpan
+    :raises ValueError: If conversion to the implementation wrapper fails
 
     """
-    impl_class = None
-    if isinstance(value, str):
+    impl_class = value
+
+    if isinstance(value, six.string_types):
         impl_class = _tracing_implementation.get(value, None)
-    else:
-        impl_class = value
+        if impl_class is None:
+            raise ValueError("Cannot convert {} to implementation wrapper".format(value))
+
     return impl_class
+
 
 class PrioritizedSetting(object):
     """Return a value for a global setting according to configuration precedence.
@@ -164,8 +171,8 @@ class PrioritizedSetting(object):
     """
 
     def __init__(
-            self, name, env_var=None, system_hook=None, default=_Unset, convert=None
-        ):
+        self, name, env_var=None, system_hook=None, default=_Unset, convert=None
+    ):
 
         self._name = name
         self._env_var = env_var
@@ -363,7 +370,7 @@ class Settings(object):
         props.update(kwargs)
         return self._config(props)
 
-    def _config(self, props): #pylint: disable=no-self-use
+    def _config(self, props):  # pylint: disable=no-self-use
         Config = namedtuple("Config", list(props.keys()))
         return Config(**props)
 
@@ -385,7 +392,7 @@ class Settings(object):
         "tracing_implementation",
         env_var="AZURE_SDK_TRACING_IMPLEMENTATION",
         convert=convert_tracing_impl,
-        default=None
+        default=None,
     )
 
 

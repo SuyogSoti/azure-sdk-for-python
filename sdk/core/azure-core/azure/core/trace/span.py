@@ -66,14 +66,6 @@ class OpenCensusSpan:
         # type: () -> None
         self.span_instance.finish()
 
-    def add_attribute(self, key, val):
-        # type: (str, str) -> None
-        self.span_instance.add_attribute(key, val)
-
-    def add_annotation(self, ann, **attrs):
-        # type: (str, Any) -> None
-        self.span_instance.add_annotation(ann, **attrs)
-
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
         tracer_from_context = self.get_current_trace_from_context()
@@ -138,14 +130,6 @@ class DataDogSpan:
     def finish(self):
         # type: () -> None
         self.span_instance.finish()
-
-    def add_attribute(self, key, val):
-        # type: (str, str) -> None
-        self.span_instance.set_tag(key, val)
-
-    def add_annotation(self, ann, **attrs):
-        # type: (str, Any) -> None
-        pass
 
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str

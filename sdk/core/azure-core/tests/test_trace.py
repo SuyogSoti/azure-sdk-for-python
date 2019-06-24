@@ -13,6 +13,7 @@ from azure.core.pipeline.transport import HttpTransport
 from azure.core.trace import use_distributed_traces
 from azure.core.trace.context import tracing_context
 from azure.core.trace.span import DataDogSpan
+from azure.core.settings import settings
 import os
 
 
@@ -73,9 +74,10 @@ class TestUseDistributedTraces(unittest.TestCase):
     def test_use_distributed_traces_decorator(self):
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
+        settings.tracing_implementation.set_value("opencensus")
         client = MockClient(policies=[])
-        client.get_foo(parent_span=parent, tracer="opencensus")
         client.get_foo(parent_span=parent)
+        client.get_foo()
         assert len(parent.children) == 2
         assert not parent.children[1].children
         assert parent.children[0].name == "MockClient.get_foo"

@@ -7,26 +7,6 @@ class AbstractSpan(Protocol):
         # type: (Any, str) -> None
         pass
 
-    @property
-    def span_id(self):
-        # type: () -> str
-        pass
-
-    @property
-    def impl_library(self):
-        # type: () -> str
-        pass
-
-    @property
-    def children(self):
-        # type: () -> List[AbstractSpan]
-        pass
-
-    @property
-    def span_instance(self):
-        # type: () -> Any
-        pass
-
     def span(self, name="child_span"):
         # type: (str) -> AbstractSpan
         """
