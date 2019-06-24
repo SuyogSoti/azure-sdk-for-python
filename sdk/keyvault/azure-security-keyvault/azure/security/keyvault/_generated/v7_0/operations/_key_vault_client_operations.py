@@ -12,7 +12,6 @@ import uuid
 
 class KeyVaultClientOperationsMixin(object):
 
-    @use_distributed_traces
     def create_key(self, vault_base_url, key_name, kty, key_size=None, key_ops=None, key_attributes=None, tags=None, curve=None, cls=None, **kwargs):
         """Creates a new key, stores it, then returns key parameters and
         attributes to the client.
@@ -98,7 +97,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     create_key.metadata = {'url': '/keys/{key-name}/create'}
 
-    @use_distributed_traces
     def import_key(self, vault_base_url, key_name, key, hsm=None, key_attributes=None, tags=None, cls=None, **kwargs):
         """Imports an externally created key, stores it, and returns key
         parameters and attributes to the client.
@@ -175,7 +173,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     import_key.metadata = {'url': '/keys/{key-name}'}
 
-    @use_distributed_traces
     def delete_key(self, vault_base_url, key_name, cls=None, **kwargs):
         """Deletes a key of any type from storage in Azure Key Vault.
 
@@ -237,7 +234,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_key.metadata = {'url': '/keys/{key-name}'}
 
-    @use_distributed_traces
     def update_key(self, vault_base_url, key_name, key_version, key_ops=None, key_attributes=None, tags=None, cls=None, **kwargs):
         """The update key operation changes specified attributes of a stored key
         and can be applied to any key type and key version stored in Azure Key
@@ -316,7 +312,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_key.metadata = {'url': '/keys/{key-name}/{key-version}'}
 
-    @use_distributed_traces
     def get_key(self, vault_base_url, key_name, key_version, cls=None, **kwargs):
         """Gets the public part of a stored key.
 
@@ -523,7 +518,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_keys.metadata = {'url': '/keys'}
 
-    @use_distributed_traces
     def backup_key(self, vault_base_url, key_name, cls=None, **kwargs):
         """Requests that a backup of the specified key be downloaded to the
         client.
@@ -595,7 +589,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     backup_key.metadata = {'url': '/keys/{key-name}/backup'}
 
-    @use_distributed_traces
     def restore_key(self, vault_base_url, key_bundle_backup, cls=None, **kwargs):
         """Restores a backed up key to a vault.
 
@@ -672,7 +665,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     restore_key.metadata = {'url': '/keys/restore'}
 
-    @use_distributed_traces
     def encrypt(self, vault_base_url, key_name, key_version, algorithm, value, cls=None, **kwargs):
         """Encrypts an arbitrary sequence of bytes using an encryption key that is
         stored in a key vault.
@@ -754,7 +746,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     encrypt.metadata = {'url': '/keys/{key-name}/{key-version}/encrypt'}
 
-    @use_distributed_traces
     def decrypt(self, vault_base_url, key_name, key_version, algorithm, value, cls=None, **kwargs):
         """Decrypts a single block of encrypted data.
 
@@ -833,7 +824,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     decrypt.metadata = {'url': '/keys/{key-name}/{key-version}/decrypt'}
 
-    @use_distributed_traces
     def sign(self, vault_base_url, key_name, key_version, algorithm, value, cls=None, **kwargs):
         """Creates a signature from a digest using the specified key.
 
@@ -910,7 +900,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     sign.metadata = {'url': '/keys/{key-name}/{key-version}/sign'}
 
-    @use_distributed_traces
     def verify(self, vault_base_url, key_name, key_version, algorithm, digest, signature, cls=None, **kwargs):
         """Verifies a signature using a specified key.
 
@@ -993,7 +982,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     verify.metadata = {'url': '/keys/{key-name}/{key-version}/verify'}
 
-    @use_distributed_traces
     def wrap_key(self, vault_base_url, key_name, key_version, algorithm, value, cls=None, **kwargs):
         """Wraps a symmetric key using a specified key.
 
@@ -1072,7 +1060,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     wrap_key.metadata = {'url': '/keys/{key-name}/{key-version}/wrapkey'}
 
-    @use_distributed_traces
     def unwrap_key(self, vault_base_url, key_name, key_version, algorithm, value, cls=None, **kwargs):
         """Unwraps a symmetric key using the specified key that was initially used
         for wrapping that key.
@@ -1222,7 +1209,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_keys.metadata = {'url': '/deletedkeys'}
 
-    @use_distributed_traces
     def get_deleted_key(self, vault_base_url, key_name, cls=None, **kwargs):
         """Gets the public part of a deleted key.
 
@@ -1283,7 +1269,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_key.metadata = {'url': '/deletedkeys/{key-name}'}
 
-    @use_distributed_traces
     def purge_deleted_key(self, vault_base_url, key_name, cls=None, **kwargs):
         """Permanently deletes the specified key.
 
@@ -1338,7 +1323,6 @@ class KeyVaultClientOperationsMixin(object):
             return cls(response, None, response_headers)
     purge_deleted_key.metadata = {'url': '/deletedkeys/{key-name}'}
 
-    @use_distributed_traces
     def recover_deleted_key(self, vault_base_url, key_name, cls=None, **kwargs):
         """Recovers the deleted key to its latest version.
 
@@ -1401,7 +1385,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     recover_deleted_key.metadata = {'url': '/deletedkeys/{key-name}/recover'}
 
-    @use_distributed_traces
     def set_secret(self, vault_base_url, secret_name, value, tags=None, content_type=None, secret_attributes=None, cls=None, **kwargs):
         """Sets a secret in a specified key vault.
 
@@ -1476,7 +1459,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     set_secret.metadata = {'url': '/secrets/{secret-name}'}
 
-    @use_distributed_traces
     def delete_secret(self, vault_base_url, secret_name, cls=None, **kwargs):
         """Deletes a secret from a specified key vault.
 
@@ -1536,7 +1518,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_secret.metadata = {'url': '/secrets/{secret-name}'}
 
-    @use_distributed_traces
     def update_secret(self, vault_base_url, secret_name, secret_version, content_type=None, secret_attributes=None, tags=None, cls=None, **kwargs):
         """Updates the attributes associated with a specified secret in a given
         key vault.
@@ -1614,7 +1595,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_secret.metadata = {'url': '/secrets/{secret-name}/{secret-version}'}
 
-    @use_distributed_traces
     def get_secret(self, vault_base_url, secret_name, secret_version, cls=None, **kwargs):
         """Get a specified secret from a given key vault.
 
@@ -1888,7 +1868,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_secrets.metadata = {'url': '/deletedsecrets'}
 
-    @use_distributed_traces
     def get_deleted_secret(self, vault_base_url, secret_name, cls=None, **kwargs):
         """Gets the specified deleted secret.
 
@@ -1948,7 +1927,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_secret.metadata = {'url': '/deletedsecrets/{secret-name}'}
 
-    @use_distributed_traces
     def purge_deleted_secret(self, vault_base_url, secret_name, cls=None, **kwargs):
         """Permanently deletes the specified secret.
 
@@ -2003,7 +1981,6 @@ class KeyVaultClientOperationsMixin(object):
             return cls(response, None, response_headers)
     purge_deleted_secret.metadata = {'url': '/deletedsecrets/{secret-name}'}
 
-    @use_distributed_traces
     def recover_deleted_secret(self, vault_base_url, secret_name, cls=None, **kwargs):
         """Recovers the deleted secret to the latest version.
 
@@ -2063,7 +2040,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     recover_deleted_secret.metadata = {'url': '/deletedsecrets/{secret-name}/recover'}
 
-    @use_distributed_traces
     def backup_secret(self, vault_base_url, secret_name, cls=None, **kwargs):
         """Backs up the specified secret.
 
@@ -2123,7 +2099,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     backup_secret.metadata = {'url': '/secrets/{secret-name}/backup'}
 
-    @use_distributed_traces
     def restore_secret(self, vault_base_url, secret_bundle_backup, cls=None, **kwargs):
         """Restores a backed up secret to a vault.
 
@@ -2263,7 +2238,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificates.metadata = {'url': '/certificates'}
 
-    @use_distributed_traces
     def delete_certificate(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Deletes a certificate from a specified key vault.
 
@@ -2324,7 +2298,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_certificate.metadata = {'url': '/certificates/{certificate-name}'}
 
-    @use_distributed_traces
     def set_certificate_contacts(self, vault_base_url, contacts, cls=None, **kwargs):
         """Sets the certificate contacts for the specified key vault.
 
@@ -2386,7 +2359,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     set_certificate_contacts.metadata = {'url': '/certificates/contacts'}
 
-    @use_distributed_traces
     def get_certificate_contacts(self, vault_base_url, cls=None, **kwargs):
         """Lists the certificate contacts for a specified key vault.
 
@@ -2443,7 +2415,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate_contacts.metadata = {'url': '/certificates/contacts'}
 
-    @use_distributed_traces
     def delete_certificate_contacts(self, vault_base_url, cls=None, **kwargs):
         """Deletes the certificate contacts for a specified key vault.
 
@@ -2569,7 +2540,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate_issuers.metadata = {'url': '/certificates/issuers'}
 
-    @use_distributed_traces
     def set_certificate_issuer(self, vault_base_url, issuer_name, provider, credentials=None, organization_details=None, attributes=None, cls=None, **kwargs):
         """Sets the specified certificate issuer.
 
@@ -2644,7 +2614,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     set_certificate_issuer.metadata = {'url': '/certificates/issuers/{issuer-name}'}
 
-    @use_distributed_traces
     def update_certificate_issuer(self, vault_base_url, issuer_name, provider=None, credentials=None, organization_details=None, attributes=None, cls=None, **kwargs):
         """Updates the specified certificate issuer.
 
@@ -2719,7 +2688,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_certificate_issuer.metadata = {'url': '/certificates/issuers/{issuer-name}'}
 
-    @use_distributed_traces
     def get_certificate_issuer(self, vault_base_url, issuer_name, cls=None, **kwargs):
         """Lists the specified certificate issuer.
 
@@ -2779,7 +2747,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate_issuer.metadata = {'url': '/certificates/issuers/{issuer-name}'}
 
-    @use_distributed_traces
     def delete_certificate_issuer(self, vault_base_url, issuer_name, cls=None, **kwargs):
         """Deletes the specified certificate issuer.
 
@@ -2839,7 +2806,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_certificate_issuer.metadata = {'url': '/certificates/issuers/{issuer-name}'}
 
-    @use_distributed_traces
     def create_certificate(self, vault_base_url, certificate_name, certificate_policy=None, certificate_attributes=None, tags=None, cls=None, **kwargs):
         """Creates a new certificate.
 
@@ -2912,7 +2878,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     create_certificate.metadata = {'url': '/certificates/{certificate-name}/create'}
 
-    @use_distributed_traces
     def import_certificate(self, vault_base_url, certificate_name, base64_encoded_certificate, password=None, certificate_policy=None, certificate_attributes=None, tags=None, cls=None, **kwargs):
         """Imports a certificate into a specified key vault.
 
@@ -3068,7 +3033,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate_versions.metadata = {'url': '/certificates/{certificate-name}/versions'}
 
-    @use_distributed_traces
     def get_certificate_policy(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Lists the policy for a certificate.
 
@@ -3129,7 +3093,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate_policy.metadata = {'url': '/certificates/{certificate-name}/policy'}
 
-    @use_distributed_traces
     def update_certificate_policy(self, vault_base_url, certificate_name, certificate_policy, cls=None, **kwargs):
         """Updates the policy for a certificate.
 
@@ -3195,7 +3158,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_certificate_policy.metadata = {'url': '/certificates/{certificate-name}/policy'}
 
-    @use_distributed_traces
     def update_certificate(self, vault_base_url, certificate_name, certificate_version, certificate_policy=None, certificate_attributes=None, tags=None, cls=None, **kwargs):
         """Updates the specified attributes associated with the given certificate.
 
@@ -3273,7 +3235,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_certificate.metadata = {'url': '/certificates/{certificate-name}/{certificate-version}'}
 
-    @use_distributed_traces
     def get_certificate(self, vault_base_url, certificate_name, certificate_version, cls=None, **kwargs):
         """Gets information about a certificate.
 
@@ -3336,7 +3297,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate.metadata = {'url': '/certificates/{certificate-name}/{certificate-version}'}
 
-    @use_distributed_traces
     def update_certificate_operation(self, vault_base_url, certificate_name, cancellation_requested, cls=None, **kwargs):
         """Updates a certificate operation.
 
@@ -3404,7 +3364,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_certificate_operation.metadata = {'url': '/certificates/{certificate-name}/pending'}
 
-    @use_distributed_traces
     def get_certificate_operation(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Gets the creation operation of a certificate.
 
@@ -3463,7 +3422,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_certificate_operation.metadata = {'url': '/certificates/{certificate-name}/pending'}
 
-    @use_distributed_traces
     def delete_certificate_operation(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Deletes the creation operation for a specific certificate.
 
@@ -3523,7 +3481,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_certificate_operation.metadata = {'url': '/certificates/{certificate-name}/pending'}
 
-    @use_distributed_traces
     def merge_certificate(self, vault_base_url, certificate_name, x509_certificates, certificate_attributes=None, tags=None, cls=None, **kwargs):
         """Merges a certificate or a certificate chain with a key pair existing on
         the server.
@@ -3599,7 +3556,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     merge_certificate.metadata = {'url': '/certificates/{certificate-name}/pending/merge'}
 
-    @use_distributed_traces
     def backup_certificate(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Backs up the specified certificate.
 
@@ -3659,7 +3615,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     backup_certificate.metadata = {'url': '/certificates/{certificate-name}/backup'}
 
-    @use_distributed_traces
     def restore_certificate(self, vault_base_url, certificate_bundle_backup, cls=None, **kwargs):
         """Restores a backed up certificate to a vault.
 
@@ -3802,7 +3757,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_certificates.metadata = {'url': '/deletedcertificates'}
 
-    @use_distributed_traces
     def get_deleted_certificate(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Retrieves information about the specified deleted certificate.
 
@@ -3863,7 +3817,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_certificate.metadata = {'url': '/deletedcertificates/{certificate-name}'}
 
-    @use_distributed_traces
     def purge_deleted_certificate(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Permanently deletes the specified deleted certificate.
 
@@ -3918,7 +3871,6 @@ class KeyVaultClientOperationsMixin(object):
             return cls(response, None, response_headers)
     purge_deleted_certificate.metadata = {'url': '/deletedcertificates/{certificate-name}'}
 
-    @use_distributed_traces
     def recover_deleted_certificate(self, vault_base_url, certificate_name, cls=None, **kwargs):
         """Recovers the deleted certificate back to its current version under
         /certificates.
@@ -4118,7 +4070,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_storage_accounts.metadata = {'url': '/deletedstorage'}
 
-    @use_distributed_traces
     def get_deleted_storage_account(self, vault_base_url, storage_account_name, cls=None, **kwargs):
         """Gets the specified deleted storage account.
 
@@ -4178,7 +4129,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_storage_account.metadata = {'url': '/deletedstorage/{storage-account-name}'}
 
-    @use_distributed_traces
     def purge_deleted_storage_account(self, vault_base_url, storage_account_name, cls=None, **kwargs):
         """Permanently deletes the specified storage account.
 
@@ -4233,7 +4183,6 @@ class KeyVaultClientOperationsMixin(object):
             return cls(response, None, response_headers)
     purge_deleted_storage_account.metadata = {'url': '/deletedstorage/{storage-account-name}'}
 
-    @use_distributed_traces
     def recover_deleted_storage_account(self, vault_base_url, storage_account_name, cls=None, **kwargs):
         """Recovers the deleted storage account.
 
@@ -4293,7 +4242,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     recover_deleted_storage_account.metadata = {'url': '/deletedstorage/{storage-account-name}/recover'}
 
-    @use_distributed_traces
     def backup_storage_account(self, vault_base_url, storage_account_name, cls=None, **kwargs):
         """Backs up the specified storage account.
 
@@ -4352,7 +4300,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     backup_storage_account.metadata = {'url': '/storage/{storage-account-name}/backup'}
 
-    @use_distributed_traces
     def restore_storage_account(self, vault_base_url, storage_bundle_backup, cls=None, **kwargs):
         """Restores a backed up storage account to a vault.
 
@@ -4417,7 +4364,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     restore_storage_account.metadata = {'url': '/storage/restore'}
 
-    @use_distributed_traces
     def delete_storage_account(self, vault_base_url, storage_account_name, cls=None, **kwargs):
         """Deletes a storage account. This operation requires the storage/delete
         permission.
@@ -4474,7 +4420,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_storage_account.metadata = {'url': '/storage/{storage-account-name}'}
 
-    @use_distributed_traces
     def get_storage_account(self, vault_base_url, storage_account_name, cls=None, **kwargs):
         """Gets information about a specified storage account. This operation
         requires the storage/get permission.
@@ -4531,7 +4476,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_storage_account.metadata = {'url': '/storage/{storage-account-name}'}
 
-    @use_distributed_traces
     def set_storage_account(self, vault_base_url, storage_account_name, resource_id, active_key_name, auto_regenerate_key, regeneration_period=None, storage_account_attributes=None, tags=None, cls=None, **kwargs):
         """Creates or updates a new storage account. This operation requires the
         storage/set permission.
@@ -4611,7 +4555,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     set_storage_account.metadata = {'url': '/storage/{storage-account-name}'}
 
-    @use_distributed_traces
     def update_storage_account(self, vault_base_url, storage_account_name, active_key_name=None, auto_regenerate_key=None, regeneration_period=None, storage_account_attributes=None, tags=None, cls=None, **kwargs):
         """Updates the specified attributes associated with the given storage
         account. This operation requires the storage/set/update permission.
@@ -4689,7 +4632,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     update_storage_account.metadata = {'url': '/storage/{storage-account-name}'}
 
-    @use_distributed_traces
     def regenerate_storage_account_key(self, vault_base_url, storage_account_name, key_name, cls=None, **kwargs):
         """Regenerates the specified key value for the given storage account. This
         operation requires the storage/regeneratekey permission.
@@ -4898,7 +4840,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_sas_definitions.metadata = {'url': '/deletedstorage/{storage-account-name}/sas'}
 
-    @use_distributed_traces
     def get_deleted_sas_definition(self, vault_base_url, storage_account_name, sas_definition_name, cls=None, **kwargs):
         """Gets the specified deleted sas definition.
 
@@ -4961,7 +4902,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_deleted_sas_definition.metadata = {'url': '/deletedstorage/{storage-account-name}/sas/{sas-definition-name}'}
 
-    @use_distributed_traces
     def recover_deleted_sas_definition(self, vault_base_url, storage_account_name, sas_definition_name, cls=None, **kwargs):
         """Recovers the deleted SAS definition.
 
@@ -5024,7 +4964,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     recover_deleted_sas_definition.metadata = {'url': '/deletedstorage/{storage-account-name}/sas/{sas-definition-name}/recover'}
 
-    @use_distributed_traces
     def delete_sas_definition(self, vault_base_url, storage_account_name, sas_definition_name, cls=None, **kwargs):
         """Deletes a SAS definition from a specified storage account. This
         operation requires the storage/deletesas permission.
@@ -5084,7 +5023,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     delete_sas_definition.metadata = {'url': '/storage/{storage-account-name}/sas/{sas-definition-name}'}
 
-    @use_distributed_traces
     def get_sas_definition(self, vault_base_url, storage_account_name, sas_definition_name, cls=None, **kwargs):
         """Gets information about a SAS definition for the specified storage
         account. This operation requires the storage/getsas permission.
@@ -5144,7 +5082,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     get_sas_definition.metadata = {'url': '/storage/{storage-account-name}/sas/{sas-definition-name}'}
 
-    @use_distributed_traces
     def set_sas_definition(self, vault_base_url, storage_account_name, sas_definition_name, template_uri, sas_type, validity_period, sas_definition_attributes=None, tags=None, cls=None, **kwargs):
         """Creates or updates a new SAS definition for the specified storage
         account. This operation requires the storage/setsas permission.
@@ -5226,7 +5163,6 @@ class KeyVaultClientOperationsMixin(object):
         return deserialized
     set_sas_definition.metadata = {'url': '/storage/{storage-account-name}/sas/{sas-definition-name}'}
 
-    @use_distributed_traces
     def update_sas_definition(self, vault_base_url, storage_account_name, sas_definition_name, template_uri=None, sas_type=None, validity_period=None, sas_definition_attributes=None, tags=None, cls=None, **kwargs):
         """Updates the specified attributes associated with the given SAS
         definition. This operation requires the storage/setsas permission.
