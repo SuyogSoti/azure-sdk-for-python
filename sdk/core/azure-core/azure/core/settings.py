@@ -32,6 +32,8 @@ from collections import namedtuple
 import logging
 import os
 from typing import Any, Union
+from azure.core.trace.span import OpenCensusSpan, DataDogSpan
+from azure.core.trace.abstract_span import AbstractSpan
 
 
 __all__ = ("settings",)
@@ -109,6 +111,29 @@ def convert_logging(value):
         )
     return level
 
+_tracing_implementation = {"opencensus": OpenCensusSpan, "datadog": DataDogSpan}
+def convert_tracing_impl(value):
+    # type: (Union[str, AbstractSpan]) -> AbstractSpan
+    """Convert a string to a Distributed Tracing Implementation Wrapper
+
+    If a tracing implementation wrapper is passed in, it is returned as-is.
+    Otherwise the function understands the following strings, ignoring case:
+
+    * "opencensus"
+    * "datadog"
+
+    :param value: the value to convert
+    :type value: string
+    :returns: int
+    :raises ValueError: If conversion to the implementation wrapper fail
+
+    """
+    impl_class = None
+    if isinstance(value, str):
+        impl_class = _tracing_implementation.get(value, None)
+    else:
+        impl_class = value
+    return impl_class
 
 class PrioritizedSetting(object):
     """Return a value for a global setting according to configuration precedence.
@@ -354,6 +379,13 @@ class Settings(object):
         env_var="AZURE_TRACING_ENABLED",
         convert=convert_bool,
         default=False,
+    )
+
+    tracing_implementation = PrioritizedSetting(
+        "tracing_implementation",
+        env_var="AZURE_SDK_TRACING_IMPLEMENTATION",
+        convert=convert_tracing_impl,
+        default=None
     )
 
 

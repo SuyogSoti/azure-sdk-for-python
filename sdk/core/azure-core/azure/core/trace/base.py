@@ -4,29 +4,24 @@ import re
 
 from azure.core.trace.context import tracing_context
 from azure.core.trace.abstract_span import AbstractSpan
-from azure.core.trace.span import SUPPORTED_TRACE_IMPLEMENTATIONS, OpenCensusSpan
+from azure.core.trace.span import OpenCensusSpan
+from azure.core.settings import settings
 
 def get_parent(kwargs, *args):
     # type: (Any) -> Tuple(Any, Any)
     parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
-    tracer_impl = kwargs.pop("tracer", None)  # type: str
-
-    if "azure_sdk_for_python_tracer" in environ:
-        tracer_impl = environ["azure_sdk_for_python_tracer"]
-
+    wrapper_class = settings.tracing_implementation()
     orig_context = tracing_context.get_current_span()
-    tracer_dict = SUPPORTED_TRACE_IMPLEMENTATIONS
 
     if parent_span is None:
         parent_span = orig_context
     else:
-        abs_class = tracer_dict.get(tracer_impl, OpenCensusSpan)
-        parent_span = abs_class(parent_span)
+        class_to_use = wrapper_class or OpenCensusSpan
+        parent_span = class_to_use(parent_span)
 
     if parent_span is None:
-        abs_class = tracer_dict.get(tracer_impl, None)
-        if abs_class is not None:
-            parent_span = abs_class(name="azure-sdk-for-python-first_parent_span")
+        if wrapper_class is not None:
+            parent_span = wrapper_class(name="azure-sdk-for-python-first_parent_span")
 
     tracing_context.set_current_span(parent_span)
     return parent_span, orig_context

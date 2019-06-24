@@ -159,6 +159,3 @@ class DataDogSpan:
     def end_tracer(tracer):
         # type: (Tracer) -> None
         pass
-
-
-SUPPORTED_TRACE_IMPLEMENTATIONS = {"opencensus": OpenCensusSpan, "datadog": DataDogSpan}
