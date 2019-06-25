@@ -27,7 +27,7 @@ class OpencensusSpan:
                     prob = settings.tracing_sampler()
                     tracer = tracer_module.Tracer(
                         exporter=AzureExporter(instrumentation_key=instrumentation_key),
-                        sampler=ProbabilitySampler(float(prob)),
+                        sampler=ProbabilitySampler(prob),
                     )
                     tracing_context.set_tracer(tracer)
                     self.was_created_by_azure_sdk = True
@@ -58,6 +58,10 @@ class OpencensusSpan:
     def finish(self):
         # type: () -> None
         self.span_instance.finish()
+        if self.was_created_by_azure_sdk:
+            tracer = tracing_context.get_azure_created_tracer()
+            tracer.end_span()
+            tracing_context.set_tracer(None)
 
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
