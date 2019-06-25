@@ -224,6 +224,11 @@ class PrioritizedSetting(object):
         """
         self._user_value = value
 
+    def unset_value(self):
+        # () -> None
+        """Unset the previous user value such that the priority is reset."""
+        self._user_value = _Unset
+
     @property
     def env_var(self):
         return self._env_var

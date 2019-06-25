@@ -71,7 +71,6 @@ class MockClient:
 
 class TestUseDistributedTraces(unittest.TestCase):
     def test_use_distributed_traces_decorator(self):
-        og_val = settings.tracing_implementation._user_value
         settings.tracing_implementation.set_value("opencensus")
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
@@ -85,10 +84,9 @@ class TestUseDistributedTraces(unittest.TestCase):
         assert not parent.children[1].children
         parent.finish()
         trace.finish()
-        settings.tracing_implementation.set_value(og_val)
+        settings.tracing_implementation.unset_value()
 
     def test_parent_span_with_opencensus(self):
-        og_val = settings.tracing_implementation._user_value
         settings.tracing_implementation.set_value("opencensus")
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
@@ -105,14 +103,13 @@ class TestUseDistributedTraces(unittest.TestCase):
         assert len(children) == 3
         parent.finish()
         trace.end_span()
-        settings.tracing_implementation.set_value(og_val)
+        settings.tracing_implementation.unset_value()
 
     def get_children_of_datadog_span(self, parent, tracer):
         traces = tracer.context_provider._local._locals.context._trace
         return [x for x in traces if x.parent_id == parent.span_id]
 
     def test_with_parent_span_with_datadog(self):
-        og_val = settings.tracing_implementation._user_value
         settings.tracing_implementation.set_value("datadog")
         parent = dd_tracer.trace(
             name="Overall", service="suyog-azure-core-v0.01-datadog"
@@ -138,7 +135,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         grandChlds = self.get_children_of_datadog_span(chlds[2], dd_tracer)
         assert len(grandChlds) == 3
         parent.finish()
-        settings.tracing_implementation.set_value(og_val)
+        settings.tracing_implementation.unset_value()
 
     def test_trace_with_no_setup(self):
         with pytest.raises(AssertionError):
@@ -155,7 +152,6 @@ class TestUseDistributedTraces(unittest.TestCase):
         os_env.stop()
 
     def test_blacklist_works(self):
-        og_val = settings.tracing_implementation._user_value
         settings.tracing_implementation.set_value("opencensus")
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
@@ -171,7 +167,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         assert parent.children[2].children[1].name == "MockClient.make_request"
         parent.finish()
         trace.end_span()
-        settings.tracing_implementation.set_value(og_val)
+        settings.tracing_implementation.unset_value()
 
     def test_without_parent_span_with_tracing_policies(self):
         client = MockClient(policies=[DistributedTracer()])

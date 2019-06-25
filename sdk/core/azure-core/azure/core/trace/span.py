@@ -8,6 +8,7 @@ class OpencensusSpan:
     def __init__(self, span=None, name="parent_span"):
         # type: (Any) -> None
         from opencensus.trace import tracer as tracer_module, execution_context, Span
+        from opencensus.trace.samplers import ProbabilitySampler
 
         self.execution_context = execution_context
 
@@ -18,26 +19,25 @@ class OpencensusSpan:
         self.was_created_by_azure_sdk = False
         if span is None:
             instrumentation_key = settings.tracing_istrumentation_key()
-            if instrumentation_key is not None:
-                if tracer is None:
+            prob = settings.tracing_sampler()
+            if tracer is None:
+                if instrumentation_key is not None:
                     from opencensus.ext.azure.trace_exporter import AzureExporter
-                    from opencensus.trace.samplers import ProbabilitySampler
 
-                    prob = settings.tracing_sampler()
                     tracer = tracer_module.Tracer(
                         exporter=AzureExporter(instrumentation_key=instrumentation_key),
                         sampler=ProbabilitySampler(prob),
                     )
-                    tracing_context.set_tracer(tracer)
-                    self.was_created_by_azure_sdk = True
-                span = tracer.span(name=name)
-            else:
-                span = Span(name=name)
+                else:
+                    tracer = tracer_module.Tracer(sampler=ProbabilitySampler(prob))
+                tracing_context.set_tracer(tracer)
+                self.was_created_by_azure_sdk = True
+            span = tracer.span(name=name)
 
         self.span_instance = span
         self.trace_id = None
         if span.context_tracer:
-            self.trace_id = span.context_tracer.trace_id
+            self.trace_id = span.context_tracer.span_context.trace_id
         self.span_id = str(span.span_id)
         self.children = []
         self.impl_library = "opencensus"
