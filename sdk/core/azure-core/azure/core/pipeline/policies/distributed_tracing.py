@@ -35,6 +35,7 @@ class DistributedTracer(SansIOHTTPPolicy):
         # type: (PipelineRequest[HTTPRequestType], Any) -> None
         parent_span = tracing_context.get_current_span()  # type: AbstractSpan
 
+        self.parent_span = parent_span
         if parent_span is None:
             return
 
@@ -43,7 +44,6 @@ class DistributedTracer(SansIOHTTPPolicy):
             self.set_header(request, parent_span)
             return
 
-        self.parent_span = parent_span
 
         child = parent_span.span(name=self.name_of_child_span)
         child.start()
