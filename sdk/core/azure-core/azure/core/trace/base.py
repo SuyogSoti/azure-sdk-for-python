@@ -9,6 +9,10 @@ from azure.core.trace.span import OpencensusSpan, DataDogSpan
 from azure.core.settings import settings
 
 
+class _Unset:
+    pass
+
+
 def convert_tracing_impl(value):
     # type: (Union[str, AbstractSpan]) -> AbstractSpan
     """Convert a string to a Distributed Tracing Implementation Wrapper
@@ -45,6 +49,7 @@ def get_parent(kwargs, *args):
         tracing_context.get_tracing_impl() or settings.tracing_implementation()
     )
     tracing_context.set_tracing_impl(wrapper_class)
+    wrapper_class = None if wrapper_class is _Unset else wrapper_class
     orig_context = tracing_context.get_current_span()
 
     if parent_span is None:
@@ -82,7 +87,7 @@ def should_use_trace(parent_span, blacklist, name_of_func):
     is_blacklisted = any([re.match(x, name_of_func) for x in blacklist])
     if is_blacklisted:
         tracing_context.set_current_span(None)
-        tracing_context.set_tracing_impl(None)
+        tracing_context.set_tracing_impl(_Unset)
     return not (parent_span is None or only_propagate or is_blacklisted)
 
 
