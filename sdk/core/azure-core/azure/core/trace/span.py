@@ -1,5 +1,4 @@
 import copy
-import os
 from typing import Any
 from azure.core.trace.context import tracing_context
 from azure.core.settings import settings
@@ -60,8 +59,7 @@ class OpencensusSpan:
         self.span_instance.finish()
         if self.was_created_by_azure_sdk:
             tracer = tracing_context.get_azure_created_tracer()
-            tracer.end_span()
-            tracing_context.set_tracer(None)
+            self.end_tracer(tracer)
 
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
@@ -88,6 +86,7 @@ class OpencensusSpan:
         # type: (Tracer) -> None
         if tracer is not None:
             tracer.end_span()
+            tracing_context.set_tracer(None)
 
 
 class DataDogSpan:
