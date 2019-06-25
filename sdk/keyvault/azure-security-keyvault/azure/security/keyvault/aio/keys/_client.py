@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, AsyncIterable, Mapping, Optional, Dict, List
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.core.trace import use_distributed_traces_async
 
 from .._internal import _AsyncKeyVaultClientBase, AsyncPagingAdapter
 from ...keys._models import Key, DeletedKey, KeyBase, KeyOperationResult
@@ -25,6 +26,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
 
     # pylint:disable=protected-access
 
+    @use_distributed_traces_async
     async def get_key(self, name: str, version: Optional[str] = None, **kwargs: Mapping[str, Any]) -> Key:
         """Gets the public part of a stored key.
 
@@ -56,6 +58,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return Key._from_key_bundle(bundle)
 
+    @use_distributed_traces_async
     async def create_key(
         self,
         name: str,
@@ -129,6 +132,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return Key._from_key_bundle(bundle)
 
+    @use_distributed_traces_async
     async def create_rsa_key(
         self,
         name: str,
@@ -191,6 +195,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
             **kwargs
         )
 
+    @use_distributed_traces_async
     async def create_ec_key(
         self,
         name: str,
@@ -255,6 +260,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
             **kwargs
         )
 
+    @use_distributed_traces_async
     async def update_key(
         self,
         name: str,
@@ -369,6 +375,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         iterable = AsyncPagingAdapter(pages, KeyBase._from_key_item)
         return iterable
 
+    @use_distributed_traces_async
     async def backup_key(self, name: str, **kwargs: Mapping[str, Any]) -> bytes:
         """Requests a backup of the specified key to the client.
 
@@ -405,6 +412,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return backup_result.value
 
+    @use_distributed_traces_async
     async def restore_key(self, backup: bytes, **kwargs: Mapping[str, Any]) -> Key:
         """Restores a backed up key to a vault.
 
@@ -441,6 +449,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return Key._from_key_bundle(bundle)
 
+    @use_distributed_traces_async
     async def delete_key(self, name: str, **kwargs: Mapping[str, Any]) -> DeletedKey:
         """Deletes a key from the Key Vault.
 
@@ -468,6 +477,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return DeletedKey._from_deleted_key_bundle(bundle)
 
+    @use_distributed_traces_async
     async def get_deleted_key(self, name: str, **kwargs: Mapping[str, Any]) -> DeletedKey:
         """Gets a deleted key from the Key Vault
 
@@ -521,6 +531,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         iterable = AsyncPagingAdapter(pages, DeletedKey._from_deleted_key_item)
         return iterable
 
+    @use_distributed_traces_async
     async def purge_deleted_key(self, name: str, **kwargs: Mapping[str, Any]) -> None:
         """Permanently deletes the specified key.
 
@@ -544,6 +555,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         """
         await self._client.purge_deleted_key(self.vault_url, name, **kwargs)
 
+    @use_distributed_traces_async
     async def recover_deleted_key(self, name: str, **kwargs: Mapping[str, Any]) -> Key:
         """Recovers the deleted key to its latest version.
 
@@ -569,6 +581,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         bundle = await self._client.recover_deleted_key(self.vault_url, name, **kwargs)
         return Key._from_key_bundle(bundle)
 
+    @use_distributed_traces_async
     async def import_key(
         self,
         name: str,
@@ -615,6 +628,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return Key._from_key_bundle(bundle)
 
+    @use_distributed_traces_async
     async def wrap_key(
         self, name: str, algorithm: str, value: bytes, version: Optional[str] = None, **kwargs: Mapping[str, Any]
     ) -> KeyOperationResult:
@@ -651,6 +665,7 @@ class KeyClient(_AsyncKeyVaultClientBase):
         )
         return KeyOperationResult(id=bundle.kid, value=bundle.result)
 
+    @use_distributed_traces_async
     async def unwrap_key(
         self, name: str, algorithm: str, value: bytes, version: Optional[str] = None, **kwargs: Mapping[str, Any]
     ) -> KeyOperationResult:

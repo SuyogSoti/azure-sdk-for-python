@@ -2,10 +2,11 @@ import copy
 import os
 from typing import Any
 from azure.core.trace.context import tracing_context
+from azure.core.settings import settings
 
 
-class OpenCensusSpan:
-    def __init__(self, span=None, name=None):
+class OpencensusSpan:
+    def __init__(self, span=None, name="parent_span"):
         # type: (Any) -> None
         from opencensus.trace import tracer as tracer_module, execution_context, Span
 
@@ -16,24 +17,16 @@ class OpenCensusSpan:
 
         tracer = tracing_context.get_azure_created_tracer()
         self.was_created_by_azure_sdk = False
-        # Attact an exporter here from environmental variable
         if span is None:
-            if name is None:
-                name = "parent_span"
-            if "APPINSIGHTS_INSTRUMENTATIONKEY" in os.environ:
+            instrumentation_key = settings.tracing_istrumentation_key()
+            if instrumentation_key is not None:
                 if tracer is None:
                     from opencensus.ext.azure.trace_exporter import AzureExporter
                     from opencensus.trace.samplers import ProbabilitySampler
 
-                    prob = 0.001
-                    if "azure_sdk_for_python_sampler" in os.environ:
-                        prob = os.environ["azure_sdk_for_python_sampler"]
+                    prob = settings.tracing_sampler()
                     tracer = tracer_module.Tracer(
-                        exporter=AzureExporter(
-                            instrumentation_key=os.environ[
-                                "APPINSIGHTS_INSTRUMENTATIONKEY"
-                            ]
-                        ),
+                        exporter=AzureExporter(instrumentation_key=instrumentation_key),
                         sampler=ProbabilitySampler(float(prob)),
                     )
                     tracing_context.set_tracer(tracer)
@@ -51,9 +44,9 @@ class OpenCensusSpan:
         self.impl_library = "opencensus"
 
     def span(self, name="child_span"):
-        # type: (str) -> OpenCensusSpan
+        # type: (str) -> OpencensusSpan
         child = self.span_instance.span(name=name)
-        wrapped_child = OpenCensusSpan(child)
+        wrapped_child = OpencensusSpan(child)
         wrapped_child.trace_id = self.trace_id
         self.children.append(wrapped_child)
         return wrapped_child

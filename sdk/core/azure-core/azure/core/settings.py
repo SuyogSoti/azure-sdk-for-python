@@ -31,17 +31,31 @@
 from collections import namedtuple
 import logging
 import os
-import six
 from typing import Any, Union
-from azure.core.trace.span import OpenCensusSpan, DataDogSpan
-from azure.core.trace.abstract_span import AbstractSpan
-
+from math import isnan
 
 __all__ = ("settings",)
 
 
 class _Unset(object):
     pass
+
+
+def convert_float(value):
+    # type: (Union[str, float]) -> float
+    """Convert a string to a float
+
+    :param value: the value to convert
+    :type value: string
+    :returns: float
+    :raises ValueError: If conversion to float fails
+    """
+    if value is None:
+        value = 0
+    float_val = float(value)
+    if isnan(float_val):
+        raise ValueError("Cannot convert {} to a float value.".format(value))
+    return float_val
 
 
 def convert_bool(value):
@@ -111,35 +125,6 @@ def convert_logging(value):
             )
         )
     return level
-
-
-_tracing_implementation = {"opencensus": OpenCensusSpan, "datadog": DataDogSpan}
-
-
-def convert_tracing_impl(value):
-    # type: (Union[str, AbstractSpan]) -> AbstractSpan
-    """Convert a string to a Distributed Tracing Implementation Wrapper
-
-    If a tracing implementation wrapper is passed in, it is returned as-is.
-    Otherwise the function understands the following strings, ignoring case:
-
-    * "opencensus"
-    * "datadog"
-
-    :param value: the value to convert
-    :type value: string
-    :returns: AbstractSpan
-    :raises ValueError: If conversion to the implementation wrapper fails
-
-    """
-    impl_class = value
-
-    if isinstance(value, six.string_types):
-        impl_class = _tracing_implementation.get(value, None)
-        if impl_class is None:
-            raise ValueError("Cannot convert {} to implementation wrapper".format(value))
-
-    return impl_class
 
 
 class PrioritizedSetting(object):
@@ -391,8 +376,20 @@ class Settings(object):
     tracing_implementation = PrioritizedSetting(
         "tracing_implementation",
         env_var="AZURE_SDK_TRACING_IMPLEMENTATION",
-        convert=convert_tracing_impl,
+        convert=False,
         default=None,
+    )
+    tracing_istrumentation_key = PrioritizedSetting(
+        "tracing_istrumentation_key",
+        env_var="APPINSIGHTS_INSTRUMENTATIONKEY",
+        convert=False,
+        default=None,
+    )
+    tracing_sampler = PrioritizedSetting(
+        "tracing_sampler",
+        env_var="AZURE_TRACING_SAMPLER",
+        convert=convert_float,
+        default=0.001,
     )
 
 

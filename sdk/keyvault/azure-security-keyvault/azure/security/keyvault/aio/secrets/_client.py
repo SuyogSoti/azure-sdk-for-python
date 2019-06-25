@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, AsyncIterable, Mapping, Optional, Dict
 
 from azure.core.exceptions import ResourceExistsError, ResourceNotFoundError
+from azure.core.trace import use_distributed_traces_async
 
 from .._internal import _AsyncKeyVaultClientBase, AsyncPagingAdapter
 from ...secrets._models import Secret, DeletedSecret, SecretAttributes
@@ -25,6 +26,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
 
     # pylint:disable=protected-access
 
+    @use_distributed_traces_async
     async def get_secret(self, name: str, version: Optional[str] = None, **kwargs: Mapping[str, Any]) -> Secret:
         """Get a specified secret from the vault.
 
@@ -50,6 +52,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         )
         return Secret._from_secret_bundle(bundle)
 
+    @use_distributed_traces_async
     async def set_secret(
         self,
         name: str,
@@ -97,6 +100,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         )
         return Secret._from_secret_bundle(bundle)
 
+    @use_distributed_traces_async
     async def update_secret(
         self,
         name: str,
@@ -200,6 +204,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         iterable = AsyncPagingAdapter(pages, SecretAttributes._from_secret_item)
         return iterable
 
+    @use_distributed_traces_async
     async def backup_secret(self, name: str, **kwargs: Mapping[str, Any]) -> bytes:
         """Backs up the specified secret.
 
@@ -224,6 +229,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         )
         return backup_result.value
 
+    @use_distributed_traces_async
     async def restore_secret(self, backup: bytes, **kwargs: Mapping[str, Any]) -> SecretAttributes:
         """Restores a backed up secret to a vault.
 
@@ -247,6 +253,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         )
         return SecretAttributes._from_secret_bundle(bundle)
 
+    @use_distributed_traces_async
     async def delete_secret(self, name: str, **kwargs: Mapping[str, Any]) -> DeletedSecret:
         """Deletes a secret from the vault.
 
@@ -271,6 +278,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         )
         return DeletedSecret._from_deleted_secret_bundle(bundle)
 
+    @use_distributed_traces_async
     async def get_deleted_secret(self, name: str, **kwargs: Mapping[str, Any]) -> DeletedSecret:
         """Gets the specified deleted secret.
 
@@ -317,6 +325,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         iterable = AsyncPagingAdapter(pages, DeletedSecret._from_deleted_secret_item)
         return iterable
 
+    @use_distributed_traces_async
     async def purge_deleted_secret(self, name: str, **kwargs: Mapping[str, Any]) -> None:
         """Permanently deletes the specified secret.
 
@@ -337,6 +346,7 @@ class SecretClient(_AsyncKeyVaultClientBase):
         """
         await self._client.purge_deleted_secret(self.vault_url, name, **kwargs)
 
+    @use_distributed_traces_async
     async def recover_deleted_secret(self, name: str, **kwargs: Mapping[str, Any]) -> SecretAttributes:
         """Recovers the deleted secret to the latest version.
 

@@ -12,7 +12,6 @@ from azure.core.pipeline.policies.distributed_tracing import DistributedTracer
 from azure.core.pipeline.transport import HttpTransport
 from azure.core.trace import use_distributed_traces
 from azure.core.trace.context import tracing_context
-from azure.core.trace.span import DataDogSpan
 from azure.core.settings import settings
 import os
 
