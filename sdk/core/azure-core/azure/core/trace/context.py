@@ -16,6 +16,8 @@ class TracingContext:
             self.data.tracer = None
         with self.lock:
             self.data.blacklist = []
+        with self.lock:
+            self.data.tracing_impl = None
 
     def set_current_span(self, current_span):
         # type: (AbstractSpan) -> None
@@ -31,6 +33,15 @@ class TracingContext:
         if "azure_sdk_for_python_only_propagate" in environ:
             return bool(environ["azure_sdk_for_python_only_propagate"])
         return False
+
+    def get_tracing_impl(self):
+        # type: () -> Union[str, AbstractSpan]
+        return getattr(self.data, "tracing_impl", None)
+
+    def set_tracing_impl(self, tracing_impl):
+        # type: (Union[str, AbstractSpan]) -> None
+        with self.lock:
+            self.data.tracing_impl = tracing_impl
 
     def get_azure_created_tracer(self):
         # type: () -> Any

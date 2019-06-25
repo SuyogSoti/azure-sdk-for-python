@@ -41,7 +41,10 @@ def convert_tracing_impl(value):
 def get_parent(kwargs, *args):
     # type: (Any) -> Tuple(Any, Any)
     parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
-    wrapper_class = convert_tracing_impl(settings.tracing_implementation())
+    wrapper_class = convert_tracing_impl(
+        tracing_context.get_tracing_impl() or settings.tracing_implementation()
+    )
+    tracing_context.set_tracing_impl(wrapper_class)
     orig_context = tracing_context.get_current_span()
 
     if parent_span is None:
@@ -70,7 +73,7 @@ def reset_context(og_blacklist, original_span_from_context, og_tracer_impl):
     # type: (List[str], Any) -> Any
     tracing_context.set_current_span(original_span_from_context)
     tracing_context.set_blacklist(og_blacklist)
-    settings.tracing_implementation.set_value(og_tracer_impl)
+    tracing_context.set_tracing_impl(og_tracer_impl)
 
 
 def should_use_trace(parent_span, blacklist, name_of_func):
@@ -79,7 +82,7 @@ def should_use_trace(parent_span, blacklist, name_of_func):
     is_blacklisted = any([re.match(x, name_of_func) for x in blacklist])
     if is_blacklisted:
         tracing_context.set_current_span(None)
-        settings.tracing_implementation.unset_value()
+        tracing_context.set_tracing_impl(None)
     return not (parent_span is None or only_propagate or is_blacklisted)
 
 
@@ -88,7 +91,7 @@ def use_distributed_traces(func):
     @functools.wraps(func)
     def wrapper_use_tracer(self, *args, **kwargs):
         # type: (Any) -> Any
-        tracing_impl_user_val = settings.tracing_implementation._user_value
+        tracing_impl_user_val = tracing_context.get_tracing_impl()
         blacklist, og_blacklist = get_blacklist(kwargs)
         parent_span, original_span_from_context = get_parent(kwargs)
         ans = None
@@ -114,7 +117,7 @@ def use_distributed_traces_async(func):
     @functools.wraps(func)
     async def wrapper_use_tracer_async(self, *args, **kwargs):
         # type: (Any) -> Any
-        og_tracer_impl = settings.tracing_implementation()
+        tracing_impl_user_val = tracing_context.get_tracing_impl()
         blacklist, og_blacklist = get_blacklist(kwargs)
         parent_span, original_span_from_context = get_parent(kwargs)
         ans = None
@@ -129,7 +132,7 @@ def use_distributed_traces_async(func):
                 parent_span.finish()
         else:
             ans = await func(self, *args, **kwargs)
-        reset_context(og_blacklist, original_span_from_context, og_tracer_impl)
+        reset_context(og_blacklist, original_span_from_context, tracing_impl_user_val)
         return ans
 
     return wrapper_use_tracer_async
