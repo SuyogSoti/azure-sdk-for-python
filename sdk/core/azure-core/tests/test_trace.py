@@ -151,24 +151,6 @@ class TestUseDistributedTraces(unittest.TestCase):
         client.make_request(2)
         os_env.stop()
 
-    def test_blacklist_works(self):
-        settings.tracing_implementation.set_value("opencensus")
-        trace = tracer.Tracer(sampler=AlwaysOnSampler())
-        parent = trace.start_span(name="OverAll")
-        client = MockClient(policies=[DistributedTracer()])
-        client.make_request(2)
-        assert len(parent.children) == 2
-        client.make_request(2, blacklist=["make_request"])
-        assert len(parent.children) == 2
-        client.make_request(2, blacklist=["get_foo"])
-        assert len(parent.children) == 3
-        assert len(parent.children[2].children) == 2
-        assert parent.children[2].children[0].name == "Azure Call"
-        assert parent.children[2].children[1].name == "MockClient.make_request"
-        parent.finish()
-        trace.end_span()
-        settings.tracing_implementation.unset_value()
-
     def test_without_parent_span_with_tracing_policies(self):
         client = MockClient(policies=[DistributedTracer()])
         res = client.make_request(2)
