@@ -1,6 +1,7 @@
 from azure.core.pipeline import PipelineRequest, PipelineResponse
 from azure.core.trace.context import tracing_context
 from azure.core.trace.abstract_span import AbstractSpan
+from azure.core.trace.base import set_span_contexts
 from azure.core.pipeline.policies import SansIOHTTPPolicy
 from azure.core.settings import settings
 from typing import Any, TypeVar
@@ -48,8 +49,8 @@ class DistributedTracer(SansIOHTTPPolicy):
 
         child = parent_span.span(name=self.name_of_child_span)
         child.start()
-
-        tracing_context.current_span.set(child)  # type: AbstractSpan
+        
+        set_span_contexts(child)
         # child = self.attach_extra_information(child, request, **kwargs)
         self.set_header(request, child)
 
@@ -62,7 +63,7 @@ class DistributedTracer(SansIOHTTPPolicy):
             only_propagate = settings.tracing_should_only_propagate()
             if span and not only_propagate:
                 span.finish()
-        tracing_context.current_span.set(self.parent_span)
+        set_span_contexts(self.parent_span)
         return span
 
     def on_response(self, request, response, **kwargs):

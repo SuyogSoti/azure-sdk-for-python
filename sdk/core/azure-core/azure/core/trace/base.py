@@ -38,6 +38,15 @@ def convert_tracing_impl(value):
     return impl_class
 
 
+def set_span_contexts(span, span_instance=None, wrapper_class=None):
+    # type: (AbstractSpan, AbstractSpan) -> None
+    tracing_context.current_span.set(span)
+    if span is not None or (span_instance is not None and wrapper_class is not None):
+        span_instance = span_instance or span.span_instance
+        span = wrapper_class or span
+        span.set_current_span(span_instance)
+
+
 def get_parent(kwargs, *args):
     # type: (Any) -> Tuple(Any, Any)
     parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
@@ -47,9 +56,8 @@ def get_parent(kwargs, *args):
     if parent_span is None:
         parent_span = orig_context
     else:
-        class_to_use = wrapper_class or OpencensusSpan
-        parent_span = class_to_use(parent_span)
-        
+        wrapper_class = wrapper_class or OpencensusSpan
+        parent_span = wrapper_class(parent_span)
 
     if parent_span is None:
         if wrapper_class is not None:
@@ -60,13 +68,11 @@ def get_parent(kwargs, *args):
                 else wrapper_class(name="azure-sdk-for-python-first_parent_span")
             )
 
-    tracing_context.current_span.set(parent_span)
-    return parent_span, orig_context
+    original_span_instance = None
+    if wrapper_class is not None:
+        original_span_instance = wrapper_class.get_current_span()
 
-
-def reset_context(original_span_from_context):
-    # type: (List[str], Any) -> Any
-    tracing_context.current_span.set(original_span_from_context)
+    return parent_span, orig_context, original_span_instance
 
 
 def should_use_trace(parent_span, name_of_func):
@@ -80,20 +86,28 @@ def use_distributed_traces(func):
     @functools.wraps(func)
     def wrapper_use_tracer(self, *args, **kwargs):
         # type: (Any) -> Any
-        parent_span, original_span_from_context = get_parent(kwargs)
+        parent_span, original_span_from_sdk_context, original_span_instance = get_parent(
+            kwargs
+        )
         ans = None
         if should_use_trace(parent_span, func.__name__):
+            set_span_contexts(parent_span)
             name = self.__class__.__name__ + "." + func.__name__
             child = parent_span.span(name=name)
             child.start()
-            tracing_context.current_span.set(child)
+            set_span_contexts(child)
             ans = func(self, *args, **kwargs)
             child.finish()
+            set_span_contexts(parent_span)
             if getattr(parent_span, "was_created_by_azure_sdk", False):
                 parent_span.finish()
+            set_span_contexts(
+                original_span_from_sdk_context,
+                span_instance=original_span_instance,
+                wrapper_class=parent_span,
+            )
         else:
             ans = func(self, *args, **kwargs)
-        reset_context(original_span_from_context)
         return ans
 
     return wrapper_use_tracer
@@ -104,20 +118,28 @@ def use_distributed_traces_async(func):
     @functools.wraps(func)
     async def wrapper_use_tracer_async(self, *args, **kwargs):
         # type: (Any) -> Any
-        parent_span, original_span_from_context = get_parent(kwargs)
+        parent_span, original_span_from_sdk_context, original_span_instance = get_parent(
+            kwargs
+        )
         ans = None
         if should_use_trace(parent_span, func.__name__):
+            set_span_contexts(parent_span)
             name = self.__class__.__name__ + "." + func.__name__
             child = parent_span.span(name=name)
             child.start()
-            tracing_context.current_span.set(child)
+            set_span_contexts(child)
             ans = await func(self, *args, **kwargs)
             child.finish()
+            set_span_contexts(parent_span)
             if getattr(parent_span, "was_created_by_azure_sdk", False):
                 parent_span.finish()
+            set_span_contexts(
+                original_span_from_sdk_context,
+                span_instance=original_span_instance,
+                wrapper_class=parent_span,
+            )
         else:
             ans = await func(self, *args, **kwargs)
-        reset_context(original_span_from_context)
         return ans
 
     return wrapper_use_tracer_async

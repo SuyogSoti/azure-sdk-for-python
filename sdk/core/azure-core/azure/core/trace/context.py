@@ -4,6 +4,7 @@ from os import environ
 from typing import List
 
 from azure.core.trace.abstract_span import AbstractSpan
+from azure.core.settings import settings
 
 try:
     import contextvars

@@ -87,6 +87,20 @@ class OpencensusSpan:
 
         return execution_context.get_opencensus_tracer()
 
+    @staticmethod
+    def set_current_span(span):
+        # type: (Span) -> None
+        from opencensus.trace import execution_context
+
+        return execution_context.set_current_span(span)
+
+    @staticmethod
+    def set_current_tracer(tracer):
+        # type: (Any) -> None
+        from opencensus.trace import execution_context
+
+        return execution_context.set_opencensus_tracer(span)
+
 
 class DataDogSpan:
     def __init__(self, span=None, name=None):
@@ -146,5 +160,15 @@ class DataDogSpan:
 
     @staticmethod
     def get_current_tracer():
-        # type: () -> Any
+        # type: () -> tracer.Tracer
         return DataDogSpan.get_current_span.tracer()
+
+    @staticmethod
+    def set_current_span(span):
+        # type: (Span) -> None
+        pass
+
+    @staticmethod
+    def set_current_tracer(tracer):
+        # type: (Any) -> None
+        pass

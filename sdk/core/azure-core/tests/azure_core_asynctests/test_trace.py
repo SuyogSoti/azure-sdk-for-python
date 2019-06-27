@@ -113,9 +113,6 @@ def get_children_of_datadog_span(parent, tracer):
     return [x for x in traces if x.parent_id == parent.span_id]
 
 
-# @pytest.mark.skip(
-#     "Datadog isssue: https://github.com/DataDog/dd-trace-py/issues/968"
-# )
 @pytest.mark.asyncio
 async def test_with_parent_span_with_datadog():
     settings.tracing_implementation.set_value("datadog")

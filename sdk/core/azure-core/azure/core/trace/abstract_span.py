@@ -1,4 +1,4 @@
-from typing import Any, List
+from typing import Any
 
 
 class AbstractSpan:
@@ -30,19 +30,33 @@ class AbstractSpan:
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
         pass
+    
+    @property
+    def span_instance(self):
+        # type: () -> Any
+        pass
 
     @staticmethod
     def end_tracer(tracer):
         # type: (Any) -> None
         pass
-    
+
     @staticmethod
     def get_current_span():
         # type: () -> AbstractSpan
         pass
 
-
     @staticmethod
     def get_current_tracer():
-        # type: () -> A
+        # type: () -> Any
+        pass
+
+    @staticmethod
+    def set_current_span(span):
+        # type: (AbstractSpan) -> None
+        pass
+
+    @staticmethod
+    def set_current_tracer(tracer):
+        # type: (Any) -> None
         pass
