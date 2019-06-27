@@ -5,7 +5,8 @@ import six
 
 from azure.core.trace.context import tracing_context
 from azure.core.trace.abstract_span import AbstractSpan
-from azure.core.trace.span import OpencensusSpan, DataDogSpan
+from azure.core.trace.ext.opencensus import OpencensusSpan
+from azure.core.trace.ext.datadog import DataDogSpan
 from azure.core.settings import settings
 
 

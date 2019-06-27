@@ -14,9 +14,7 @@ class DistributedTracer(SansIOHTTPPolicy):
     """The policy to create spans for Azure Calls"""
 
     def __init__(
-        self,
-        name_of_spans="Azure Call",
-        header_label="distributed_tracing_propagator",
+        self, name_of_spans="Azure Call", header_label="distributed_tracing_propagator"
     ):
         # type: (str, str, str) -> None
         self.name_of_child_span = name_of_spans
@@ -46,10 +44,9 @@ class DistributedTracer(SansIOHTTPPolicy):
             self.set_header(request, parent_span)
             return
 
-
         child = parent_span.span(name=self.name_of_child_span)
         child.start()
-        
+
         set_span_contexts(child)
         # child = self.attach_extra_information(child, request, **kwargs)
         self.set_header(request, child)
