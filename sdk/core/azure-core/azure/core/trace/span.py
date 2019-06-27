@@ -7,15 +7,10 @@ from azure.core.settings import settings
 class OpencensusSpan:
     def __init__(self, span=None, name="parent_span"):
         # type: (Any) -> None
-        from opencensus.trace import tracer as tracer_module, execution_context, Span
+        from opencensus.trace import tracer as tracer_module, Span
         from opencensus.trace.samplers import ProbabilitySampler
 
-        self.execution_context = execution_context
-
-        if span is None:
-            span = self.execution_context.get_current_span()
-
-        tracer = self.execution_context.get_opencensus_tracer()
+        tracer = OpencensusSpan.get_current_tracer()
         self.was_created_by_azure_sdk = False
         if span is None:
             instrumentation_key = settings.tracing_istrumentation_key()
@@ -31,7 +26,6 @@ class OpencensusSpan:
                 else:
                     tracer = tracer_module.Tracer(sampler=ProbabilitySampler(prob))
                 self.was_created_by_azure_sdk = True
-                tracing_context.current_tracer.set(tracer)
             span = tracer.span(name=name)
 
         self.tracer = tracer
@@ -63,7 +57,7 @@ class OpencensusSpan:
 
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
-        tracer_from_context = self.get_current_trace_from_context()
+        tracer_from_context = OpencensusSpan.get_current_tracer()
         header = ""
         if tracer_from_context is not None:
             ctx = copy.deepcopy(tracer_from_context.span_context)
@@ -73,20 +67,25 @@ class OpencensusSpan:
             headers.update(tempDict)
         return header
 
-    def get_current_span_from_context(self):
-        # type: () -> Span
-        return self.execution_context.get_current_span()
-
-    def get_current_trace_from_context(self):
-        # type: () -> Tracer
-        return self.execution_context.get_opencensus_tracer()
-
     @staticmethod
     def end_tracer(tracer):
         # type: (Tracer) -> None
         if tracer is not None:
             tracer.end_span()
-            tracing_context.current_tracer.set(None)
+
+    @staticmethod
+    def get_current_span():
+        # type: () -> AbstractSpan
+        from opencensus.trace import execution_context
+
+        return execution_context.get_current_span()
+
+    @staticmethod
+    def get_current_tracer():
+        # type: () -> Any
+        from opencensus.trace import execution_context
+
+        return execution_context.get_opencensus_tracer()
 
 
 class DataDogSpan:
@@ -95,8 +94,6 @@ class DataDogSpan:
         from ddtrace import tracer
 
         self.was_created_by_azure_sdk = False
-        if span is None:
-            span = tracer.current_span()
 
         if span is None:
             if name is None:
@@ -139,3 +136,15 @@ class DataDogSpan:
     def end_tracer(tracer):
         # type: (Tracer) -> None
         pass
+
+    @staticmethod
+    def get_current_span():
+        # type: () -> AbstractSpan
+        from ddtrace import tracer
+
+        return tracer.current_span()
+
+    @staticmethod
+    def get_current_tracer():
+        # type: () -> Any
+        return DataDogSpan.get_current_span.tracer()

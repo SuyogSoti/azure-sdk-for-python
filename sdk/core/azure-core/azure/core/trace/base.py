@@ -49,10 +49,16 @@ def get_parent(kwargs, *args):
     else:
         class_to_use = wrapper_class or OpencensusSpan
         parent_span = class_to_use(parent_span)
+        
 
     if parent_span is None:
         if wrapper_class is not None:
-            parent_span = wrapper_class(name="azure-sdk-for-python-first_parent_span")
+            current_span = wrapper_class.get_current_span()
+            parent_span = (
+                wrapper_class(span=current_span)
+                if current_span
+                else wrapper_class(name="azure-sdk-for-python-first_parent_span")
+            )
 
     tracing_context.current_span.set(parent_span)
     return parent_span, orig_context

@@ -85,7 +85,6 @@ class TracingContext:
     def __init__(self):
         # type: () -> None
         self.current_span = TracingContext.register_slot("current_span", None)
-        self.current_tracer = TracingContext.register_slot("current_tracer", None)
 
     @classmethod
     def register_slot(cls, name, default_val):

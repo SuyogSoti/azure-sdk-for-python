@@ -35,3 +35,14 @@ class AbstractSpan:
     def end_tracer(tracer):
         # type: (Any) -> None
         pass
+    
+    @staticmethod
+    def get_current_span():
+        # type: () -> AbstractSpan
+        pass
+
+
+    @staticmethod
+    def get_current_tracer():
+        # type: () -> A
+        pass
