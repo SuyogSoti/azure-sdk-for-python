@@ -15,7 +15,7 @@ class OpencensusSpan:
         if span is None:
             span = self.execution_context.get_current_span()
 
-        tracer = tracing_context.get_azure_created_tracer()
+        tracer = self.execution_context.get_opencensus_tracer()
         self.was_created_by_azure_sdk = False
         if span is None:
             instrumentation_key = settings.tracing_istrumentation_key()
@@ -30,14 +30,15 @@ class OpencensusSpan:
                     )
                 else:
                     tracer = tracer_module.Tracer(sampler=ProbabilitySampler(prob))
-                tracing_context.set_tracer(tracer)
                 self.was_created_by_azure_sdk = True
+                tracing_context.current_tracer.set(tracer)
             span = tracer.span(name=name)
 
+        self.tracer = tracer
         self.span_instance = span
         self.trace_id = None
         if span.context_tracer:
-            self.trace_id = span.context_tracer.span_context.trace_id
+            self.trace_id = self.tracer.tracer.trace_id
         self.span_id = str(span.span_id)
         self.children = []
         self.impl_library = "opencensus"
@@ -58,8 +59,7 @@ class OpencensusSpan:
         # type: () -> None
         self.span_instance.finish()
         if self.was_created_by_azure_sdk:
-            tracer = tracing_context.get_azure_created_tracer()
-            self.end_tracer(tracer)
+            self.end_tracer(self.tracer)
 
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
@@ -86,7 +86,7 @@ class OpencensusSpan:
         # type: (Tracer) -> None
         if tracer is not None:
             tracer.end_span()
-            tracing_context.set_tracer(None)
+            tracing_context.current_tracer.set(None)
 
 
 class DataDogSpan:

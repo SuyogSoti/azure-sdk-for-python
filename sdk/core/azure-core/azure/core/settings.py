@@ -396,6 +396,12 @@ class Settings(object):
         convert=convert_float,
         default=0.001,
     )
+    tracing_should_only_propagate = PrioritizedSetting(
+        "tracing_should_only_propagate",
+        env_var="AZURE_TRACING_ONLY_PROPAGATE",
+        convert=convert_bool,
+        default=False,
+    )
 
 
 settings = Settings()

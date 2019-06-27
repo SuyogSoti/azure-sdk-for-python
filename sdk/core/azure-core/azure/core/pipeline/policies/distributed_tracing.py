@@ -2,6 +2,7 @@ from azure.core.pipeline import PipelineRequest, PipelineResponse
 from azure.core.trace.context import tracing_context
 from azure.core.trace.abstract_span import AbstractSpan
 from azure.core.pipeline.policies import SansIOHTTPPolicy
+from azure.core.settings import settings
 from typing import Any, TypeVar
 
 HTTPResponseType = TypeVar("HTTPResponseType")
@@ -33,13 +34,13 @@ class DistributedTracer(SansIOHTTPPolicy):
 
     def on_request(self, request, **kwargs):
         # type: (PipelineRequest[HTTPRequestType], Any) -> None
-        parent_span = tracing_context.get_current_span()  # type: AbstractSpan
+        parent_span = tracing_context.current_span.get()  # type: AbstractSpan
 
         self.parent_span = parent_span
         if parent_span is None:
             return
 
-        only_propagate = tracing_context.should_only_propagate()
+        only_propagate = settings.tracing_should_only_propagate()
         if only_propagate:
             self.set_header(request, parent_span)
             return
@@ -48,7 +49,7 @@ class DistributedTracer(SansIOHTTPPolicy):
         child = parent_span.span(name=self.name_of_child_span)
         child.start()
 
-        tracing_context.set_current_span(child)  # type: AbstractSpan
+        tracing_context.current_span.set(child)  # type: AbstractSpan
         # child = self.attach_extra_information(child, request, **kwargs)
         self.set_header(request, child)
 
@@ -58,10 +59,10 @@ class DistributedTracer(SansIOHTTPPolicy):
         header = request.http_request.headers.pop(self.header_label, None)
         if header is not None:
             span = self.span_dict.pop(header, None)  # type: AbstractSpan
-            only_propagate = tracing_context.should_only_propagate()
+            only_propagate = settings.tracing_should_only_propagate()
             if span and not only_propagate:
                 span.finish()
-        tracing_context.set_current_span(self.parent_span)
+        tracing_context.current_span.set(self.parent_span)
         return span
 
     def on_response(self, request, response, **kwargs):

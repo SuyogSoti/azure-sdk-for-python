@@ -36,7 +36,7 @@ class MockClient:
         self.assert_current_span = assert_current_span
 
     def verify_request(self, request):
-        current_span = tracing_context.get_current_span()
+        current_span = tracing_context.current_span.get()
         if self.assert_current_span:
             assert current_span is not None
         if (

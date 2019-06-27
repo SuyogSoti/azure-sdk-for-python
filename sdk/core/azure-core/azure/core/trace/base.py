@@ -41,11 +41,8 @@ def convert_tracing_impl(value):
 def get_parent(kwargs, *args):
     # type: (Any) -> Tuple(Any, Any)
     parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
-    wrapper_class = convert_tracing_impl(
-        tracing_context.get_tracing_impl() or settings.tracing_implementation()
-    )
-    tracing_context.set_tracing_impl(wrapper_class)
-    orig_context = tracing_context.get_current_span()
+    wrapper_class = convert_tracing_impl(settings.tracing_implementation())
+    orig_context = tracing_context.current_span.get()
 
     if parent_span is None:
         parent_span = orig_context
@@ -57,19 +54,18 @@ def get_parent(kwargs, *args):
         if wrapper_class is not None:
             parent_span = wrapper_class(name="azure-sdk-for-python-first_parent_span")
 
-    tracing_context.set_current_span(parent_span)
+    tracing_context.current_span.set(parent_span)
     return parent_span, orig_context
 
 
-def reset_context(original_span_from_context, og_tracer_impl):
+def reset_context(original_span_from_context):
     # type: (List[str], Any) -> Any
-    tracing_context.set_current_span(original_span_from_context)
-    tracing_context.set_tracing_impl(og_tracer_impl)
+    tracing_context.current_span.set(original_span_from_context)
 
 
 def should_use_trace(parent_span, name_of_func):
     # type: (AbstractSpan, List[str], str)
-    only_propagate = tracing_context.should_only_propagate()
+    only_propagate = settings.tracing_should_only_propagate()
     return not (parent_span is None or only_propagate)
 
 
@@ -78,21 +74,20 @@ def use_distributed_traces(func):
     @functools.wraps(func)
     def wrapper_use_tracer(self, *args, **kwargs):
         # type: (Any) -> Any
-        tracing_impl_user_val = tracing_context.get_tracing_impl()
         parent_span, original_span_from_context = get_parent(kwargs)
         ans = None
         if should_use_trace(parent_span, func.__name__):
             name = self.__class__.__name__ + "." + func.__name__
             child = parent_span.span(name=name)
             child.start()
-            tracing_context.set_current_span(child)
+            tracing_context.current_span.set(child)
             ans = func(self, *args, **kwargs)
             child.finish()
             if getattr(parent_span, "was_created_by_azure_sdk", False):
                 parent_span.finish()
         else:
             ans = func(self, *args, **kwargs)
-        reset_context(original_span_from_context, tracing_impl_user_val)
+        reset_context(original_span_from_context)
         return ans
 
     return wrapper_use_tracer
@@ -103,21 +98,20 @@ def use_distributed_traces_async(func):
     @functools.wraps(func)
     async def wrapper_use_tracer_async(self, *args, **kwargs):
         # type: (Any) -> Any
-        tracing_impl_user_val = tracing_context.get_tracing_impl()
         parent_span, original_span_from_context = get_parent(kwargs)
         ans = None
         if should_use_trace(parent_span, func.__name__):
             name = self.__class__.__name__ + "." + func.__name__
             child = parent_span.span(name=name)
             child.start()
-            tracing_context.set_current_span(child)
+            tracing_context.current_span.set(child)
             ans = await func(self, *args, **kwargs)
             child.finish()
             if getattr(parent_span, "was_created_by_azure_sdk", False):
                 parent_span.finish()
         else:
             ans = await func(self, *args, **kwargs)
-        reset_context(original_span_from_context, tracing_impl_user_val)
+        reset_context(original_span_from_context)
         return ans
 
     return wrapper_use_tracer_async
