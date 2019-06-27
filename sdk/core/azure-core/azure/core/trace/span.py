@@ -8,6 +8,7 @@ class OpencensusSpan:
     def __init__(self, span=None, name="parent_span"):
         # type: (Any) -> None
         from opencensus.trace import tracer as tracer_module, execution_context, Span
+        from opencensus.trace.tracers.noop_tracer import NoopTracer
         from opencensus.trace.samplers import ProbabilitySampler
 
         self.execution_context = execution_context
@@ -20,7 +21,7 @@ class OpencensusSpan:
         if span is None:
             instrumentation_key = settings.tracing_istrumentation_key()
             prob = settings.tracing_sampler()
-            if tracer is None:
+            if tracer is None or isinstance(tracer, NoopTracer):
                 if instrumentation_key is not None:
                     from opencensus.ext.azure.trace_exporter import AzureExporter
 
@@ -35,10 +36,10 @@ class OpencensusSpan:
             span = tracer.span(name=name)
 
         self.tracer = tracer
-        self.span_instance = span
         self.trace_id = None
         if span.context_tracer:
-            self.trace_id = self.tracer.tracer.trace_id
+            self.trace_id = span.context_tracer.span_context.trace_id
+        self.span_instance = span
         self.span_id = str(span.span_id)
         self.children = []
         self.impl_library = "opencensus"

@@ -12,7 +12,7 @@ from azure.core.pipeline.policies.distributed_tracing import DistributedTracer
 from azure.core.pipeline.transport import HttpTransport
 from azure.core.trace import use_distributed_traces, use_distributed_traces_async
 from azure.core.trace.context import tracing_context
-from azure.core.trace.span import DataDogSpan
+from azure.core.settings import settings
 import os
 
 
@@ -71,113 +71,99 @@ class MockClient:
 
 @pytest.mark.asyncio
 async def test_use_distributed_traces_decorator():
+    settings.tracing_implementation.set_value("opencensus")
     trace = tracer.Tracer(sampler=AlwaysOnSampler())
     parent = trace.start_span(name="OverAll")
     client = MockClient(policies=[])
-    await client.get_foo(parent_span=parent, tracer="opencensus")
     await client.get_foo(parent_span=parent)
-    assert len(parent.children) == 2
-    assert not parent.children[1].children
-    assert parent.children[0].name == "MockClient.get_foo"
+    await client.get_foo()
+    assert len(parent.children) == 3
+    assert parent.children[0].name == "MockClient.__init__"
     assert not parent.children[0].children
+    assert parent.children[1].name == "MockClient.get_foo"
+    assert not parent.children[1].children
     parent.finish()
-    trace.end_span()
+    trace.finish()
+    settings.tracing_implementation.unset_value()
+
 
 @pytest.mark.asyncio
 async def test_parent_span_with_opencensus():
+    settings.tracing_implementation.set_value("opencensus")
     trace = tracer.Tracer(sampler=AlwaysOnSampler())
     parent = trace.start_span(name="OverAll")
     client = MockClient(policies=[DistributedTracer()])
-    attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
-    annotations = ["first Ann", "Second Ann"]
     await client.make_request(2)
-    await client.make_request(2, tracer="opencensus")
+    with parent.span("child") as child:
+        await client.make_request(2, parent_span=child)
     await client.make_request(2)
-    await client.make_request(2, parent_span=parent, tracer="opencensus")
-    await client.make_request(2)
-    await client.make_request(2, tracer="opencensus")
-    await client.make_request(2)
-    assert len(parent.children) == 3
-    assert parent.children[0].name == "MockClient.make_request"
-    children = parent.children[0].children
+    assert len(parent.children) == 4
+    assert parent.children[0].name == "MockClient.__init__"
+    assert parent.children[1].name == "MockClient.make_request"
+    assert parent.children[2].children[0].name == "MockClient.make_request"
+    children = parent.children[1].children
     assert len(children) == 3
     parent.finish()
     trace.end_span()
+    settings.tracing_implementation.unset_value()
+
 
 def get_children_of_datadog_span(parent, tracer):
     traces = tracer.context_provider._local._locals.context._trace
     return [x for x in traces if x.parent_id == parent.span_id]
 
+
+# @pytest.mark.skip(
+#     "Datadog isssue: https://github.com/DataDog/dd-trace-py/issues/968"
+# )
 @pytest.mark.asyncio
-@pytest.mark.skip(
-    "Datadog isssue: https://github.com/DataDog/dd-trace-py/issues/968"
-)
 async def test_with_parent_span_with_datadog():
+    settings.tracing_implementation.set_value("datadog")
+    parent = dd_tracer.trace(name="Overall", service="suyog-azure-core-v0.01-datadog")
     client = MockClient(policies=[DistributedTracer()])
-    parent = dd_tracer.trace(
-        name="Overall", service="suyog-azure-core-v0.01-datadog"
-    )
-    attrs = {"firstKey": "firstVal", "secondKey": "secondVal"}
-    await client.make_request(2)
-    await client.make_request(2, tracer="datadog")
-    await client.make_request(2)
     chlds = get_children_of_datadog_span(parent, dd_tracer)
     assert len(chlds) == 1
-    await client.make_request(2, parent_span=parent, tracer="datadog")
     await client.make_request(2)
     chlds = get_children_of_datadog_span(parent, dd_tracer)
     assert len(chlds) == 2
-    await client.make_request(2, tracer="datadog")
-    await client.make_request(2)
+    await client.make_request(2, parent_span=parent)
     chlds = get_children_of_datadog_span(parent, dd_tracer)
     assert len(chlds) == 3
-    assert chlds[0].name == "MockClient.make_request"
+    await client.make_request(2)
+    chlds = get_children_of_datadog_span(parent, dd_tracer)
+    assert len(chlds) == 4
+    assert chlds[0].name == "MockClient.__init__"
     assert chlds[1].name == "MockClient.make_request"
     assert chlds[2].name == "MockClient.make_request"
-    grandChlds = get_children_of_datadog_span(chlds[0], dd_tracer)
-    assert len(grandChlds) == 3
+    assert chlds[3].name == "MockClient.make_request"
     grandChlds = get_children_of_datadog_span(chlds[1], dd_tracer)
     assert len(grandChlds) == 3
-    # TODO(suyogsoti)figure out a way to add annotations
+    grandChlds = get_children_of_datadog_span(chlds[2], dd_tracer)
+    assert len(grandChlds) == 3
     parent.finish()
+    settings.tracing_implementation.unset_value()
+
 
 @pytest.mark.asyncio
 async def test_trace_with_not_setup():
     with pytest.raises(AssertionError):
-        client = MockClient(
-            policies=[DistributedTracer()], assert_current_span=True
-        )
+        client = MockClient(policies=[DistributedTracer()], assert_current_span=True)
         await client.make_request(2)
     os_env = mock.patch.dict(
-        os.environ, {"azure_sdk_for_python_tracer": "opencensus"}
+        os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
     )
     os_env.start()
     client = MockClient(policies=[DistributedTracer()], assert_current_span=True)
     await client.make_request(2)
     os_env.stop()
 
-@pytest.mark.asyncio
-async def test_blacklist_works():
-    trace = tracer.Tracer(sampler=AlwaysOnSampler())
-    parent = trace.start_span(name="OverAll")
-    client = MockClient(policies=[DistributedTracer()])
-    await client.make_request(2, tracer="opencensus")
-    assert len(parent.children) == 1
-    await client.make_request(2, tracer="opencensus", blacklist=["make_request"])
-    assert len(parent.children) == 1
-    await client.make_request(2, tracer="opencensus", blacklist=["get_foo"])
-    assert len(parent.children) == 2
-    assert len(parent.children[1].children) == 2
-    assert parent.children[1].children[0].name == "Azure Call"
-    assert parent.children[1].children[1].name == "MockClient.make_request"
-    parent.finish()
-    trace.end_span()
 
 @pytest.mark.asyncio
 async def test_without_parent_span_with_tracing_policies():
     client = MockClient(policies=[DistributedTracer()])
     res = await client.make_request(2)
     assert res is client.expected_response
+
 
 @pytest.mark.asyncio
 async def test_with_parent_span_without_tracing_policies():
@@ -186,6 +172,7 @@ async def test_with_parent_span_without_tracing_policies():
     await client.make_request(2, parent_span=parent)
     assert len(parent.children[0].children) == 2
     parent.finish()
+
 
 @pytest.mark.asyncio
 async def test_without_parent_span_without_tracing_policies():
