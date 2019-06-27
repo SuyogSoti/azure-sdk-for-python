@@ -13,11 +13,12 @@ except ImportError:
 
 __all__ = ["tracing_context"]
 
+
 class ContextProtocol(Protocol):
     def __init__(self, name, default, lock):
         # type: (string, Any, threading.Lock) -> None
         pass
-    
+
     def clear(self):
         # type: () -> None
         pass
@@ -25,7 +26,7 @@ class ContextProtocol(Protocol):
     def get(self):
         # type: () -> Any
         pass
-    
+
     def set(self, value):
         # type: (Any) -> None
         pass
