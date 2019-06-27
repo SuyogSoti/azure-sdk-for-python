@@ -1,8 +1,7 @@
 from typing import Any, List
-from typing_extensions import Protocol
 
 
-class AbstractSpan(Protocol):
+class AbstractSpan:
     def __init__(self, span=None, name=None):
         # type: (Any, str) -> None
         pass

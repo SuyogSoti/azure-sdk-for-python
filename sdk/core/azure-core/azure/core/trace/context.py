@@ -1,4 +1,3 @@
-from typing_extensions import Protocol
 from typing import Any
 import threading
 from os import environ
@@ -14,7 +13,7 @@ except ImportError:
 __all__ = ["tracing_context"]
 
 
-class ContextProtocol(Protocol):
+class ContextProtocol:
     def __init__(self, name, default, lock):
         # type: (string, Any, threading.Lock) -> None
         pass
