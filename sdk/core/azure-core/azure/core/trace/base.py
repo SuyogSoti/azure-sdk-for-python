@@ -1,42 +1,11 @@
 import functools
 from os import environ
 import re
-import six
 
 from azure.core.trace.context import tracing_context
 from azure.core.trace.abstract_span import AbstractSpan
 from azure.core.trace.ext.opencensus import OpencensusSpan
-from azure.core.trace.ext.datadog import DataDogSpan
 from azure.core.settings import settings
-
-
-def convert_tracing_impl(value):
-    # type: (Union[str, AbstractSpan]) -> AbstractSpan
-    """Convert a string to a Distributed Tracing Implementation Wrapper
-
-    If a tracing implementation wrapper is passed in, it is returned as-is.
-    Otherwise the function understands the following strings, ignoring case:
-
-    * "opencensus"
-    * "datadog"
-
-    :param value: the value to convert
-    :type value: string
-    :returns: AbstractSpan
-    :raises ValueError: If conversion to the implementation wrapper fails
-
-    """
-    _tracing_implementation = {"opencensus": OpencensusSpan, "datadog": DataDogSpan}
-    impl_class = value
-
-    if isinstance(value, six.string_types):
-        impl_class = _tracing_implementation.get(value.lower(), None)
-        if impl_class is None:
-            raise ValueError(
-                "Cannot convert {} to implementation wrapper".format(value)
-            )
-
-    return impl_class
 
 
 def set_span_contexts(span, span_instance=None, wrapper_class=None):
@@ -51,7 +20,9 @@ def set_span_contexts(span, span_instance=None, wrapper_class=None):
 def get_parent(kwargs, *args):
     # type: (Any) -> Tuple(Any, Any)
     parent_span = kwargs.pop("parent_span", None)  # type: AbstractSpan
-    wrapper_class = convert_tracing_impl(settings.tracing_implementation())
+    wrapper_class = tracing_context.convert_tracing_impl(
+        settings.tracing_implementation()
+    )
     orig_context = tracing_context.current_span.get()
 
     if parent_span is None:

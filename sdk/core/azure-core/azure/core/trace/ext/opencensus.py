@@ -1,5 +1,5 @@
 from typing import Any
-from azure.core.settings import settings
+import os
 
 
 class OpencensusSpan:
@@ -12,8 +12,8 @@ class OpencensusSpan:
         tracer = OpencensusSpan.get_current_tracer()
         self.was_created_by_azure_sdk = False
         if span is None:
-            instrumentation_key = settings.tracing_istrumentation_key()
-            prob = settings.tracing_sampler()
+            instrumentation_key = self._get_environ("APPINSIGHTS_INSTRUMENTATIONKEY")
+            prob = self._get_environ("AZURE_TRACING_SAMPLER") or 0.001
             if tracer is None or isinstance(tracer, NoopTracer):
                 if instrumentation_key is not None:
                     from opencensus.ext.azure.trace_exporter import AzureExporter
@@ -34,6 +34,12 @@ class OpencensusSpan:
         self.span_instance = span
         self.span_id = str(span.span_id)
         self.children = []
+
+    def _get_environ(self, key):
+        # type: (str) -> str
+        if key in os.environ:
+            return os.environ[key]
+        return None
 
     def span(self, name="child_span"):
         # type: (str) -> OpencensusSpan
@@ -94,4 +100,4 @@ class OpencensusSpan:
         # type: (Any) -> None
         from opencensus.trace import execution_context
 
-        return execution_context.set_opencensus_tracer(span)
+        return execution_context.set_opencensus_tracer(tracer)

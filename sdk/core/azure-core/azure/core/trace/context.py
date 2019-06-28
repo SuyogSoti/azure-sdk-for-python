@@ -2,8 +2,11 @@ from typing import Any, Callable
 import threading
 from os import environ
 from typing import List
+import six
 
 from azure.core.trace.abstract_span import AbstractSpan
+from azure.core.trace.ext.opencensus import OpencensusSpan
+from azure.core.trace.ext.datadog import DataDogSpan
 
 try:
     import contextvars
@@ -85,35 +88,51 @@ class TracingContext:
     def __init__(self):
         # type: () -> None
         self.current_span = TracingContext.register_slot("current_span", None)
+        self.tracing_impl = TracingContext.register_slot("tracing_impl", None)
 
     def with_current_context(self, func):
         # type: (Callable[Any, Any]) -> Any
-        caller_context = self.get_snapshot()
+        wrapper_class = self.convert_tracing_impl(self.tracing_impl.get())
+        if wrapper_class is not None:
+            current_impl_span = wrapper_class.get_current_span()
+            current_impl_tracer = wrapper_class.get_current_tracer()
 
         def call_with_current_context(*args, **kwargs):
-            try:
-                backup_context = self.get_snapshot()
-                self.apply(caller_context)
-                return func(*args, **kwargs)
-            finally:
-                self.apply(backup_context)
+            if wrapper_class is not None:
+                wrapper_class.set_current_span(current_impl_span)
+                wrapper_class.set_current_tracer(current_impl_tracer)
+                self.current_span.set(wrapper_class(current_impl_span))
+            return func(*args, **kwargs)
 
         return call_with_current_context
 
-    def apply(self, contexts):
-        for key in contexts:
-            val = contexts[key]
-            attr = getattr(self, key)
-            attr.set(val)
+    def convert_tracing_impl(self, value):
+        # type: (Union[str, AbstractSpan]) -> AbstractSpan
+        """Convert a string to a Distributed Tracing Implementation Wrapper
 
-    def get_snapshot(self):
-        # type: () -> Dict[str, Any]
-        attrs = vars(self)
-        new_dict = {}
-        for key in attrs:
-            if isinstance(attrs[key], TracingContext._context):
-                new_dict[key] = attrs[key].get()
-        return new_dict
+        If a tracing implementation wrapper is passed in, it is returned as-is.
+        Otherwise the function understands the following strings, ignoring case:
+
+        * "opencensus"
+        * "datadog"
+
+        :param value: the value to convert
+        :type value: string
+        :returns: AbstractSpan
+        :raises ValueError: If conversion to the implementation wrapper fails
+
+        """
+        _tracing_implementation = {"opencensus": OpencensusSpan, "datadog": DataDogSpan}
+        impl_class = value
+
+        if isinstance(value, six.string_types):
+            impl_class = _tracing_implementation.get(value.lower(), None)
+            if impl_class is None:
+                raise ValueError(
+                    "Cannot convert {} to implementation wrapper".format(value)
+                )
+
+        return impl_class
 
     @classmethod
     def register_slot(cls, name, default_val):

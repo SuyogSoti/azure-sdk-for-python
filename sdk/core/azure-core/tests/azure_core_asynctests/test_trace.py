@@ -196,13 +196,21 @@ def do_async(coroutine, *args, **kwargs):
     finally:
         loop.close()
 
+
 @pytest.mark.asyncio
 async def test_multi_threaded_work():
-    config_integration.trace_integrations(["threading"])
     os_env = mock.patch.dict(
-        os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+        os.environ,
+        {
+            "AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus",
+            "AZURE_TRACING_USE_THREADING": "yes",
+        },
     )
     os_env.start()
+    settings.use_threading._on_set(os.environ["AZURE_TRACING_USE_THREADING"])
+    settings.tracing_implementation._on_set(
+        os.environ["AZURE_SDK_TRACING_IMPLEMENTATION"]
+    )
     trace = tracer.Tracer(sampler=AlwaysOnSampler())
     parent = trace.start_span(name="OverAll")
     client = MockClient(policies=[DistributedTracer()])
@@ -210,10 +218,7 @@ async def test_multi_threaded_work():
     threads = []
     number_of_threads = 4
     for i in range(number_of_threads):
-        passed_context = tracing_context.with_current_context(client.make_request)
-        th = threading.Thread(
-            target=do_async, args=(passed_context, 3)
-        )
+        th = threading.Thread(target=do_async, args=(client.make_request, 3))
         threads.append(th)
         th.start()
 
@@ -225,6 +230,7 @@ async def test_multi_threaded_work():
     assert len(parent.children) == number_of_threads + 2
     parent.finish()
     trace.end_span()
+
     os_env.stop()
 
 

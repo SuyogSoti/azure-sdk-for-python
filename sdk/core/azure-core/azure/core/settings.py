@@ -29,10 +29,13 @@
 """
 
 from collections import namedtuple
+import threading
 import logging
 import os
 from typing import Any, Union
 from math import isnan
+
+from azure.core.trace.context import tracing_context
 
 __all__ = ("settings",)
 
@@ -78,9 +81,9 @@ def convert_bool(value):
         return value  # type: ignore
 
     val = value.lower()  # type: ignore
-    if val in ["yes", "1", "on"]:
+    if val in ["yes", "1", "on", "true", "True"]:
         return True
-    if val in ["no", "0", "off"]:
+    if val in ["no", "0", "off", "false", "False"]:
         return False
     raise ValueError("Cannot convert {} to boolean value".format(value))
 
@@ -92,6 +95,28 @@ _levels = {
     "INFO": logging.INFO,
     "DEBUG": logging.DEBUG,
 }
+
+
+def _thread_init_wrapper(func):
+    def wrapper(*args, **kwargs):
+        target = kwargs.pop("target", None)
+        if target is not None:
+            target = tracing_context.with_current_context(target)
+        kwargs["target"] = target
+        return func(*args, **kwargs)
+
+    return wrapper
+
+
+_old_threading_init = threading.Thread.__init__
+
+
+def monkey_patch_threading(value):
+    use_thread = convert_bool(value)
+    if use_thread:
+        setattr(threading.Thread, "__init__", _thread_init_wrapper(_old_threading_init))
+    else:
+        setattr(threading.Thread, "__init__", _old_threading_init)
 
 
 def convert_logging(value):
@@ -156,7 +181,13 @@ class PrioritizedSetting(object):
     """
 
     def __init__(
-        self, name, env_var=None, system_hook=None, default=_Unset, convert=None
+        self,
+        name,
+        env_var=None,
+        system_hook=None,
+        default=_Unset,
+        convert=None,
+        on_set=None,
     ):
 
         self._name = name
@@ -164,7 +195,11 @@ class PrioritizedSetting(object):
         self._system_hook = system_hook
         self._default = default
         self._convert = convert if convert else lambda x: x
+        self._on_set = on_set if on_set else lambda x: x
         self._user_value = _Unset
+
+        if self._env_var and self._env_var in os.environ:
+            self._on_set(os.environ[self._env_var])
 
     def __repr__(self):
         # type () -> str
@@ -222,6 +257,7 @@ class PrioritizedSetting(object):
         :returns: None
 
         """
+        self._on_set(value)
         self._user_value = value
 
     def unset_value(self):
@@ -383,18 +419,7 @@ class Settings(object):
         env_var="AZURE_SDK_TRACING_IMPLEMENTATION",
         convert=False,
         default=None,
-    )
-    tracing_istrumentation_key = PrioritizedSetting(
-        "tracing_istrumentation_key",
-        env_var="APPINSIGHTS_INSTRUMENTATIONKEY",
-        convert=False,
-        default=None,
-    )
-    tracing_sampler = PrioritizedSetting(
-        "tracing_sampler",
-        env_var="AZURE_TRACING_SAMPLER",
-        convert=convert_float,
-        default=0.001,
+        on_set=tracing_context.tracing_impl.set,
     )
     tracing_should_only_propagate = PrioritizedSetting(
         "tracing_should_only_propagate",
@@ -405,6 +430,7 @@ class Settings(object):
     use_threading = PrioritizedSetting(
         "use_threading",
         env_var="AZURE_TRACING_USE_THREADING",
+        on_set=monkey_patch_threading,
         convert=convert_bool,
         default=False,
     )

@@ -178,11 +178,18 @@ class TestTrace(unittest.TestCase):
         assert res is client.expected_response
 
     def test_multi_threaded_work(self):
-        config_integration.trace_integrations(["threading"])
         os_env = mock.patch.dict(
-            os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+            os.environ,
+            {
+                "AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus",
+                "AZURE_TRACING_USE_THREADING": "yes",
+            },
         )
         os_env.start()
+        settings.use_threading._on_set(os.environ["AZURE_TRACING_USE_THREADING"])
+        settings.tracing_implementation._on_set(
+            os.environ["AZURE_SDK_TRACING_IMPLEMENTATION"]
+        )
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
         client = MockClient(policies=[DistributedTracer()])
@@ -190,10 +197,7 @@ class TestTrace(unittest.TestCase):
         threads = []
         number_of_threads = 4
         for i in range(number_of_threads):
-            th = threading.Thread(
-                target=tracing_context.with_current_context(client.make_request),
-                args=(3,),
-            )
+            th = threading.Thread(target=client.make_request, args=(3,))
             threads.append(th)
             th.start()
 
@@ -205,6 +209,7 @@ class TestTrace(unittest.TestCase):
         assert len(parent.children) == number_of_threads + 2
         parent.finish()
         trace.end_span()
+
         os_env.stop()
 
 
