@@ -402,6 +402,12 @@ class Settings(object):
         convert=convert_bool,
         default=False,
     )
+    use_threading = PrioritizedSetting(
+        "use_threading",
+        env_var="AZURE_TRACING_USE_THREADING",
+        convert=convert_bool,
+        default=False,
+    )
 
 
 settings = Settings()
