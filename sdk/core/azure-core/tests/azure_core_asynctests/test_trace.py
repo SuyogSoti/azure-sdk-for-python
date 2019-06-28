@@ -18,7 +18,6 @@ import os
 
 
 from opencensus.trace import tracer, Span
-from opencensus.trace import config_integration
 from opencensus.trace.samplers import AlwaysOnSampler
 from ddtrace import tracer as dd_tracer
 
@@ -179,34 +178,6 @@ async def test_without_parent_span_without_tracing_policies():
     client = MockClient(policies=[])
     res = await client.make_request(2)
     assert res is client.expected_response
-
-
-@pytest.mark.asyncio
-async def test_multi_threaded_work():
-    config_integration.trace_integrations(["threading"])
-    settings.tracing_implementation.set_value("opencensus")
-    trace = tracer.Tracer(sampler=AlwaysOnSampler())
-    parent = trace.start_span(name="OverAll")
-    client = MockClient(policies=[DistributedTracer()])
-
-    threads = []
-    number_of_threads = 4
-    for i in range(number_of_threads):
-        th = threading.Thread(
-            target=tracing_context.with_current_context(client.make_request), args=(3,)
-        )
-        threads.append(th)
-        th.start()
-
-    for thread in threads:
-        thread.join()
-
-    await client.make_request(3)
-
-    # assert len(parent.children) == number_of_threads + 2
-    parent.finish()
-    trace.end_span()
-    settings.tracing_implementation.unset_value()
 
 
 if __name__ == "__main__":
