@@ -170,7 +170,7 @@ class TestTrace(unittest.TestCase):
         assert res is client.expected_response
 
     def test_multi_threaded_work(self):
-        config_integration.trace_integrations(['threading'])
+        config_integration.trace_integrations(["threading"])
         settings.tracing_implementation.set_value("opencensus")
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
@@ -190,7 +190,6 @@ class TestTrace(unittest.TestCase):
             thread.join()
 
         client.make_request(3)
-
 
         assert len(parent.children) == number_of_threads + 2
         parent.finish()
