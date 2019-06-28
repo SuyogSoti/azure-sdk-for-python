@@ -1,5 +1,6 @@
 import unittest
 import pytest
+import threading
 
 try:
     from unittest import mock
@@ -13,6 +14,7 @@ from azure.core.pipeline.transport import HttpTransport
 from azure.core.trace import use_distributed_traces
 from azure.core.trace.context import tracing_context
 from azure.core.settings import settings
+from opencensus.trace import config_integration
 import os
 
 
@@ -44,15 +46,13 @@ class MockClient:
             and current_span is not None
             and len(current_span.children) > 0
         ):
-            header = current_span.children[0].to_header({})
-            dist_pol = self.policies[0]
             header_label = ""
-            if current_span.impl_library is "opencensus":
+            impl_lib = settings.tracing_implementation()
+            if impl_lib is "opencensus":
                 header_label = "traceparent"
-            elif current_span.impl_library is "datadog":
+            elif impl_lib is "datadog":
                 header_label = "x-datadog-trace-id"
             assert header_label in request.http_request.headers
-            assert request.http_request.headers[dist_pol.header_label] == header
         return self.expected_response
 
     @use_distributed_traces
@@ -69,7 +69,7 @@ class MockClient:
         return 5
 
 
-class TestUseDistributedTraces(unittest.TestCase):
+class TestTrace(unittest.TestCase):
     def test_use_distributed_traces_decorator(self):
         settings.tracing_implementation.set_value("opencensus")
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
@@ -152,6 +152,7 @@ class TestUseDistributedTraces(unittest.TestCase):
         os_env.stop()
 
     def test_without_parent_span_with_tracing_policies(self):
+        settings.tracing_implementation.unset_value()
         client = MockClient(policies=[DistributedTracer()])
         res = client.make_request(2)
         assert res is client.expected_response
@@ -160,13 +161,41 @@ class TestUseDistributedTraces(unittest.TestCase):
         client = MockClient(policies=[])
         parent = Span(name="Overall")
         client.make_request(2, parent_span=parent)
-        assert len(parent.children[0].children) == 2
+        assert len(parent.children[0].children) == 3
         parent.finish()
 
     def test_without_parent_span_without_tracing_policies(self):
         client = MockClient(policies=[])
         res = client.make_request(2)
         assert res is client.expected_response
+
+    def test_multi_threaded_work(self):
+        config_integration.trace_integrations(['threading'])
+        settings.tracing_implementation.set_value("opencensus")
+        trace = tracer.Tracer(sampler=AlwaysOnSampler())
+        parent = trace.start_span(name="OverAll")
+        client = MockClient(policies=[DistributedTracer()])
+
+        threads = []
+        number_of_threads = 4
+        for i in range(number_of_threads):
+            th = threading.Thread(
+                target=tracing_context.with_current_context(client.make_request),
+                args=(3,),
+            )
+            threads.append(th)
+            th.start()
+
+        for thread in threads:
+            thread.join()
+
+        client.make_request(3)
+
+
+        assert len(parent.children) == number_of_threads + 2
+        parent.finish()
+        trace.end_span()
+        settings.tracing_implementation.unset_value()
 
 
 if __name__ == "__main__":

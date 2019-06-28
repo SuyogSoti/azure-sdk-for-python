@@ -1,6 +1,4 @@
-import copy
 from typing import Any
-
 from azure.core.settings import settings
 
 
@@ -8,6 +6,7 @@ class OpencensusSpan:
     def __init__(self, span=None, name="parent_span"):
         # type: (Any) -> None
         from opencensus.trace import tracer as tracer_module, Span
+        from opencensus.trace.tracers.noop_tracer import NoopTracer
         from opencensus.trace.samplers import ProbabilitySampler
 
         tracer = OpencensusSpan.get_current_tracer()
@@ -15,7 +14,7 @@ class OpencensusSpan:
         if span is None:
             instrumentation_key = settings.tracing_istrumentation_key()
             prob = settings.tracing_sampler()
-            if tracer is None:
+            if tracer is None or isinstance(tracer, NoopTracer):
                 if instrumentation_key is not None:
                     from opencensus.ext.azure.trace_exporter import AzureExporter
 
@@ -35,7 +34,6 @@ class OpencensusSpan:
         self.span_instance = span
         self.span_id = str(span.span_id)
         self.children = []
-        self.impl_library = "opencensus"
 
     def span(self, name="child_span"):
         # type: (str) -> OpencensusSpan
@@ -58,14 +56,11 @@ class OpencensusSpan:
     def to_header(self, headers):
         # type: (Dict[str, str]) -> str
         tracer_from_context = OpencensusSpan.get_current_tracer()
-        header = ""
+        temp_headers = {}
         if tracer_from_context is not None:
-            ctx = copy.deepcopy(tracer_from_context.span_context)
-            ctx.span_id = self.span_id
-            header = "{}-{}".format(ctx.span_id, ctx.trace_id)
-            tempDict = tracer_from_context.propagator.to_headers(ctx)
-            headers.update(tempDict)
-        return header
+            ctx = tracer_from_context.span_context
+            temp_headers = tracer_from_context.propagator.to_headers(ctx)
+        return temp_headers
 
     @staticmethod
     def end_tracer(tracer):

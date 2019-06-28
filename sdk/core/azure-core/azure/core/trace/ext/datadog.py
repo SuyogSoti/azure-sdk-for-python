@@ -15,7 +15,6 @@ class DataDogSpan:
         self.span_id = str(span.span_id)
         self.trace_id = span.trace_id
         self.children = []
-        self.impl_library = "datadog"
 
     def span(self, name="child_span"):
         # type: (str) -> DataDogSpan
@@ -40,7 +39,7 @@ class DataDogSpan:
 
         propogator = HTTPPropagator()
         propogator.inject(self.span_instance.context, headers)
-        return "{}-{}".format(self.span_id, self.trace_id)
+        return headers
 
     @staticmethod
     def end_tracer(tracer):

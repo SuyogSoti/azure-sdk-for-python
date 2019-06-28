@@ -33,6 +33,7 @@ from azure.core.pipeline import (
     PipelineContext,
 )
 from azure.core.pipeline.policies import HTTPPolicy, SansIOHTTPPolicy
+from azure.core.trace import use_distributed_traces
 from typing import (
     Generic,
     TypeVar,
@@ -152,6 +153,7 @@ class Pipeline(AbstractContextManager, Generic[HTTPRequestType, HTTPResponseType
     def __exit__(self, *exc_details):  # pylint: disable=arguments-differ
         self._transport.__exit__(*exc_details)
 
+    @use_distributed_traces
     def run(self, request, **kwargs):
         # type: (HTTPRequestType, Any) -> PipelineResponse
         """Runs the HTTP Request through the chained policies.

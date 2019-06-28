@@ -13,29 +13,23 @@ HTTPRequestType = TypeVar("HTTPRequestType")
 class DistributedTracer(SansIOHTTPPolicy):
     """The policy to create spans for Azure Calls"""
 
-    def __init__(
-        self, name_of_spans="Azure Call", header_label="distributed_tracing_propagator"
-    ):
+    def __init__(self, name_of_spans="Azure Call"):
         # type: (str, str, str) -> None
         self.name_of_child_span = name_of_spans
-        self.header_label = header_label
-        self.parent_span = None
-        self.span_dict = {}
+        self.parent_span_dict = {}
 
     def set_header(self, request, span):
         # type: (PipelineRequest[HTTPRequestType], Any) -> None
         """
         Sets the header information on the span.
         """
-        header = span.to_header(request.http_request.headers)
-        self.span_dict[header] = span
-        request.http_request.headers[self.header_label] = header
+        headers = span.to_header(request.http_request.headers)
+        request.http_request.headers.update(headers)
 
     def on_request(self, request, **kwargs):
         # type: (PipelineRequest[HTTPRequestType], Any) -> None
         parent_span = tracing_context.current_span.get()  # type: AbstractSpan
 
-        self.parent_span = parent_span
         if parent_span is None:
             return
 
@@ -48,25 +42,21 @@ class DistributedTracer(SansIOHTTPPolicy):
         child.start()
 
         set_span_contexts(child)
-        # child = self.attach_extra_information(child, request, **kwargs)
+        self.parent_span_dict[child] = parent_span
         self.set_header(request, child)
 
-    def end_span(self, request):
-        # type: (PipelineRequest[HTTPRequestType]) -> Any
-        span = None
-        header = request.http_request.headers.pop(self.header_label, None)
-        if header is not None:
-            span = self.span_dict.pop(header, None)  # type: AbstractSpan
-            only_propagate = settings.tracing_should_only_propagate()
-            if span and not only_propagate:
-                span.finish()
-        set_span_contexts(self.parent_span)
-        return span
+    def end_span(self):
+        # type: (PipelineRequest[HTTPRequestType]) -> None
+        span = tracing_context.current_span.get()
+        only_propagate = settings.tracing_should_only_propagate()
+        if span and not only_propagate:
+            span.finish()
+            set_span_contexts(self.parent_span_dict[span])
 
     def on_response(self, request, response, **kwargs):
         # type: (PipelineRequest[HTTPRequestType], PipelineResponse[HTTPRequestType, HTTPResponseType], Any) -> None
-        self.end_span(request)
+        self.end_span()
 
     def on_exception(self, request, **kwargs):
         # type: (PipelineRequest[HTTPRequestType], Any) -> bool
-        self.end_span(request)
+        self.end_span()

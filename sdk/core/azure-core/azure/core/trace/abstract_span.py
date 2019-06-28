@@ -28,7 +28,7 @@ class AbstractSpan:
         pass
 
     def to_header(self, headers):
-        # type: (Dict[str, str]) -> str
+        # type: (Dict[str, str]) -> Dict[str, str]
         pass
     
     @property

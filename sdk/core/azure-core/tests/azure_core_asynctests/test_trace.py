@@ -1,5 +1,6 @@
 import unittest
 import pytest
+import threading
 
 try:
     from unittest import mock
@@ -17,6 +18,7 @@ import os
 
 
 from opencensus.trace import tracer, Span
+from opencensus.trace import config_integration
 from opencensus.trace.samplers import AlwaysOnSampler
 from ddtrace import tracer as dd_tracer
 
@@ -142,7 +144,7 @@ async def test_with_parent_span_with_datadog():
 
 
 @pytest.mark.asyncio
-async def test_trace_with_not_setup():
+async def test_trace_with_no_setup():
     with pytest.raises(AssertionError):
         client = MockClient(policies=[DistributedTracer()], assert_current_span=True)
         await client.make_request(2)
@@ -157,6 +159,7 @@ async def test_trace_with_not_setup():
 
 @pytest.mark.asyncio
 async def test_without_parent_span_with_tracing_policies():
+    settings.tracing_implementation.unset_value()
     client = MockClient(policies=[DistributedTracer()])
     res = await client.make_request(2)
     assert res is client.expected_response
@@ -167,7 +170,7 @@ async def test_with_parent_span_without_tracing_policies():
     client = MockClient(policies=[])
     parent = Span(name="Overall")
     await client.make_request(2, parent_span=parent)
-    assert len(parent.children[0].children) == 2
+    assert len(parent.children[0].children) == 3
     parent.finish()
 
 
@@ -176,6 +179,34 @@ async def test_without_parent_span_without_tracing_policies():
     client = MockClient(policies=[])
     res = await client.make_request(2)
     assert res is client.expected_response
+
+
+@pytest.mark.asyncio
+async def test_multi_threaded_work():
+    config_integration.trace_integrations(["threading"])
+    settings.tracing_implementation.set_value("opencensus")
+    trace = tracer.Tracer(sampler=AlwaysOnSampler())
+    parent = trace.start_span(name="OverAll")
+    client = MockClient(policies=[DistributedTracer()])
+
+    threads = []
+    number_of_threads = 4
+    for i in range(number_of_threads):
+        th = threading.Thread(
+            target=tracing_context.with_current_context(client.make_request), args=(3,)
+        )
+        threads.append(th)
+        th.start()
+
+    for thread in threads:
+        thread.join()
+
+    await client.make_request(3)
+
+    # assert len(parent.children) == number_of_threads + 2
+    parent.finish()
+    trace.end_span()
+    settings.tracing_implementation.unset_value()
 
 
 if __name__ == "__main__":

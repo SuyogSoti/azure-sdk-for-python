@@ -29,6 +29,7 @@ from typing import Any, Union, List, Generic, TypeVar
 
 from azure.core.pipeline import PipelineRequest, PipelineResponse, PipelineContext
 from azure.core.pipeline.policies import AsyncHTTPPolicy, SansIOHTTPPolicy
+from azure.core.trace import use_distributed_traces_async
 
 AsyncHTTPResponseType = TypeVar("AsyncHTTPResponseType")
 HTTPRequestType = TypeVar("HTTPRequestType")
@@ -153,6 +154,7 @@ class AsyncPipeline(AbstractAsyncContextManager, Generic[HTTPRequestType, AsyncH
     async def __aexit__(self, *exc_details):  # pylint: disable=arguments-differ
         await self._transport.__aexit__(*exc_details)
 
+    @use_distributed_traces_async
     async def run(self, request: PipelineRequest, **kwargs: Any):
         """Runs the HTTP Request through the chained policies.
 
