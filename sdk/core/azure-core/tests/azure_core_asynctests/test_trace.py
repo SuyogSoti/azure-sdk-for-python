@@ -72,7 +72,10 @@ class MockClient:
 
 @pytest.mark.asyncio
 async def test_use_distributed_traces_decorator():
-    settings.tracing_implementation.set_value("opencensus")
+    os_env = mock.patch.dict(
+        os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+    )
+    os_env.start()
     trace = tracer.Tracer(sampler=AlwaysOnSampler())
     parent = trace.start_span(name="OverAll")
     client = MockClient(policies=[])
@@ -85,12 +88,15 @@ async def test_use_distributed_traces_decorator():
     assert not parent.children[1].children
     parent.finish()
     trace.finish()
-    settings.tracing_implementation.unset_value()
+    os_env.stop()
 
 
 @pytest.mark.asyncio
 async def test_parent_span_with_opencensus():
-    settings.tracing_implementation.set_value("opencensus")
+    os_env = mock.patch.dict(
+        os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+    )
+    os_env.start()
     trace = tracer.Tracer(sampler=AlwaysOnSampler())
     parent = trace.start_span(name="OverAll")
     client = MockClient(policies=[DistributedTracer()])
@@ -106,7 +112,7 @@ async def test_parent_span_with_opencensus():
     assert len(children) == 3
     parent.finish()
     trace.end_span()
-    settings.tracing_implementation.unset_value()
+    os_env.stop()
 
 
 def get_children_of_datadog_span(parent, tracer):
@@ -116,7 +122,10 @@ def get_children_of_datadog_span(parent, tracer):
 
 @pytest.mark.asyncio
 async def test_with_parent_span_with_datadog():
-    settings.tracing_implementation.set_value("datadog")
+    os_env = mock.patch.dict(
+        os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "datadog"}
+    )
+    os_env.start()
     parent = dd_tracer.trace(name="Overall", service="suyog-azure-core-v0.01-datadog")
     client = MockClient(policies=[DistributedTracer()])
     chlds = get_children_of_datadog_span(parent, dd_tracer)
@@ -139,7 +148,7 @@ async def test_with_parent_span_with_datadog():
     grandChlds = get_children_of_datadog_span(chlds[2], dd_tracer)
     assert len(grandChlds) == 3
     parent.finish()
-    settings.tracing_implementation.unset_value()
+    os_env.stop()
 
 
 @pytest.mark.asyncio
@@ -158,7 +167,6 @@ async def test_trace_with_no_setup():
 
 @pytest.mark.asyncio
 async def test_without_parent_span_with_tracing_policies():
-    settings.tracing_implementation.unset_value()
     client = MockClient(policies=[DistributedTracer()])
     res = await client.make_request(2)
     assert res is client.expected_response

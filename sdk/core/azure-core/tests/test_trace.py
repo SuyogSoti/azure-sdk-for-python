@@ -71,7 +71,10 @@ class MockClient:
 
 class TestTrace(unittest.TestCase):
     def test_use_distributed_traces_decorator(self):
-        settings.tracing_implementation.set_value("opencensus")
+        os_env = mock.patch.dict(
+            os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+        )
+        os_env.start()
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
         client = MockClient(policies=[])
@@ -84,10 +87,13 @@ class TestTrace(unittest.TestCase):
         assert not parent.children[1].children
         parent.finish()
         trace.finish()
-        settings.tracing_implementation.unset_value()
+        os_env.stop()
 
     def test_parent_span_with_opencensus(self):
-        settings.tracing_implementation.set_value("opencensus")
+        os_env = mock.patch.dict(
+            os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+        )
+        os_env.start()
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
         client = MockClient(policies=[DistributedTracer()])
@@ -103,14 +109,17 @@ class TestTrace(unittest.TestCase):
         assert len(children) == 3
         parent.finish()
         trace.end_span()
-        settings.tracing_implementation.unset_value()
+        os_env.stop()
 
     def get_children_of_datadog_span(self, parent, tracer):
         traces = tracer.context_provider._local._locals.context._trace
         return [x for x in traces if x.parent_id == parent.span_id]
 
     def test_with_parent_span_with_datadog(self):
-        settings.tracing_implementation.set_value("datadog")
+        os_env = mock.patch.dict(
+            os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "datadog"}
+        )
+        os_env.start()
         parent = dd_tracer.trace(
             name="Overall", service="suyog-azure-core-v0.01-datadog"
         )
@@ -135,7 +144,7 @@ class TestTrace(unittest.TestCase):
         grandChlds = self.get_children_of_datadog_span(chlds[2], dd_tracer)
         assert len(grandChlds) == 3
         parent.finish()
-        settings.tracing_implementation.unset_value()
+        os_env.stop()
 
     def test_trace_with_no_setup(self):
         with pytest.raises(AssertionError):
@@ -152,7 +161,6 @@ class TestTrace(unittest.TestCase):
         os_env.stop()
 
     def test_without_parent_span_with_tracing_policies(self):
-        settings.tracing_implementation.unset_value()
         client = MockClient(policies=[DistributedTracer()])
         res = client.make_request(2)
         assert res is client.expected_response
@@ -171,7 +179,10 @@ class TestTrace(unittest.TestCase):
 
     def test_multi_threaded_work(self):
         config_integration.trace_integrations(["threading"])
-        settings.tracing_implementation.set_value("opencensus")
+        os_env = mock.patch.dict(
+            os.environ, {"AZURE_SDK_TRACING_IMPLEMENTATION": "opencensus"}
+        )
+        os_env.start()
         trace = tracer.Tracer(sampler=AlwaysOnSampler())
         parent = trace.start_span(name="OverAll")
         client = MockClient(policies=[DistributedTracer()])
@@ -194,7 +205,7 @@ class TestTrace(unittest.TestCase):
         assert len(parent.children) == number_of_threads + 2
         parent.finish()
         trace.end_span()
-        settings.tracing_implementation.unset_value()
+        os_env.stop()
 
 
 if __name__ == "__main__":
