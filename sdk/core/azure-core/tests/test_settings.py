@@ -28,6 +28,10 @@ import os
 
 import pytest
 
+try:
+    from unittest import mock
+except ImportError:
+    import mock
 # module under test
 import azure.core.settings as m
 
@@ -74,7 +78,7 @@ class TestPrioritizedSetting(object):
         ps = m.PrioritizedSetting("foo")
         ps.set_value(40)
         assert ps() == 40
-    
+
     def test_user_unset(self):
         ps = m.PrioritizedSetting("foo", default=2)
         ps.set_value(40)
@@ -86,6 +90,12 @@ class TestPrioritizedSetting(object):
         ps = m.PrioritizedSetting("foo", convert=int)
         ps.set_value("40")
         assert ps() == 40
+
+    @mock.patch("os.chdir")
+    def test_on_set(self, mocked_func):
+        ps = m.PrioritizedSetting("foo", convert=int, on_set=mocked_func)
+        ps.set_value("40")
+        assert mocked_func.called
 
     def test_immediate(self):
         ps = m.PrioritizedSetting("foo")
