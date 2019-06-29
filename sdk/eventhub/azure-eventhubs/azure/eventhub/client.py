@@ -21,6 +21,8 @@ from uamqp import constants
 from uamqp import errors
 from uamqp import compat
 
+from azure.core.trace import use_distributed_traces
+
 from azure.eventhub.producer import EventHubProducer
 from azure.eventhub.consumer import EventHubConsumer
 from azure.eventhub.common import parse_sas_token, EventPosition
@@ -47,6 +49,7 @@ class EventHubClient(EventHubClientAbstract):
 
     """
 
+    @use_distributed_traces
     def _create_auth(self, username=None, password=None):
         """
         Create an ~uamqp.authentication.SASTokenAuth instance to authenticate
@@ -92,6 +95,7 @@ class EventHubClient(EventHubClientAbstract):
                                                get_jwt_token, http_proxy=http_proxy,
                                                transport_type=transport_type)
 
+    @use_distributed_traces
     def _management_request(self, mgmt_msg, op_type):
         alt_creds = {
             "username": self._auth_config.get("iot_username"),
@@ -122,6 +126,7 @@ class EventHubClient(EventHubClientAbstract):
             finally:
                 mgmt_client.close()
 
+    @use_distributed_traces
     def get_properties(self):
         # type:() -> Dict[str, Any]
         """
@@ -145,6 +150,7 @@ class EventHubClient(EventHubClientAbstract):
             output['partition_ids'] = [p.decode('utf-8') for p in eh_info[b'partition_ids']]
         return output
 
+    @use_distributed_traces
     def get_partition_ids(self):
         # type:() -> List[str]
         """
@@ -155,6 +161,7 @@ class EventHubClient(EventHubClientAbstract):
         """
         return self.get_properties()['partition_ids']
 
+    @use_distributed_traces
     def get_partition_properties(self, partition):
         # type:(str) -> Dict[str, Any]
         """
@@ -190,6 +197,7 @@ class EventHubClient(EventHubClientAbstract):
             output['is_empty'] = partition_info[b'is_partition_empty']
         return output
 
+    @use_distributed_traces
     def create_consumer(
             self, consumer_group, partition_id, event_position,
             owner_level=None, operation=None, prefetch=None,
@@ -234,6 +242,7 @@ class EventHubClient(EventHubClientAbstract):
             prefetch=prefetch)
         return handler
 
+    @use_distributed_traces
     def create_producer(self, partition_id=None, operation=None, send_timeout=None):
         # type: (str, str, float) -> EventHubProducer
         """

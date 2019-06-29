@@ -13,6 +13,8 @@ from uamqp import constants, errors
 from uamqp import compat
 from uamqp import SendClient
 
+from azure.core.trace import use_distributed_traces
+
 from azure.eventhub.common import EventData, _BatchSendEventData
 from azure.eventhub.error import EventHubError, ConnectError, \
     AuthenticationError, EventDataError, EventDataSendError, ConnectionLostError, _error_handler
@@ -29,6 +31,7 @@ class EventHubProducer(object):
 
     """
 
+    @use_distributed_traces
     def __init__(self, client, target, partition=None, send_timeout=60, keep_alive=None, auto_reconnect=True):
         """
         Instantiate an EventHubProducer. EventHubProducer should be instantiated by calling the `create_producer` method
@@ -79,12 +82,15 @@ class EventHubProducer(object):
         self._outcome = None
         self._condition = None
 
+    @use_distributed_traces
     def __enter__(self):
         return self
 
+    @use_distributed_traces
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close(exc_val)
 
+    @use_distributed_traces
     def _open(self):
         """
         Open the EventHubProducer using the supplied connection.
@@ -109,6 +115,7 @@ class EventHubProducer(object):
             self._connect()
             self.running = True
 
+    @use_distributed_traces
     def _connect(self):
         connected = self._build_connection()
         if not connected:
@@ -116,6 +123,7 @@ class EventHubProducer(object):
             while not self._build_connection(is_reconnect=True):
                 time.sleep(self.reconnect_backoff)
 
+    @use_distributed_traces
     def _build_connection(self, is_reconnect=False):
         """
 
@@ -191,9 +199,11 @@ class EventHubProducer(object):
             self.close(exception=error)
             raise error
 
+    @use_distributed_traces
     def _reconnect(self):
         return self._build_connection(is_reconnect=True)
 
+    @use_distributed_traces
     def _send_event_data(self):
         self._open()
         max_retries = self.client.config.max_retries
@@ -270,17 +280,20 @@ class EventHubProducer(object):
                 self.close(exception=error)
                 raise error
 
+    @use_distributed_traces
     def _check_closed(self):
         if self.error:
             raise EventHubError("This producer has been closed. Please create a new producer to send event data.", self.error)
 
     @staticmethod
+    @use_distributed_traces
     def _set_partition_key(event_datas, partition_key):
         ed_iter = iter(event_datas)
         for ed in ed_iter:
             ed._set_partition_key(partition_key)
             yield ed
 
+    @use_distributed_traces
     def _on_outcome(self, outcome, condition):
         """
         Called when the outcome is received for a delivery.
@@ -294,10 +307,12 @@ class EventHubProducer(object):
         self._condition = condition
 
     @staticmethod
+    @use_distributed_traces
     def _error(outcome, condition):
         if outcome != constants.MessageSendResult.Ok:
             raise condition
 
+    @use_distributed_traces
     def send(self, event_data, partition_key=None):
         # type:(Union[EventData, Union[List[EventData], Iterator[EventData], Generator[EventData]]], Union[str, bytes]) -> None
         """
@@ -338,6 +353,7 @@ class EventHubProducer(object):
         self.unsent_events = [wrapper_event_data.message]
         self._send_event_data()
 
+    @use_distributed_traces
     def close(self, exception=None):
         # type:(Exception) -> None
         """

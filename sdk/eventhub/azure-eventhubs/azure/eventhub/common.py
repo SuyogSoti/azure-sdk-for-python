@@ -9,10 +9,13 @@ import calendar
 import json
 import six
 
+from azure.core.trace.context import tracing_context
+from azure.core.trace import use_distributed_traces
 from uamqp import BatchMessage, Message, types
 from uamqp.message import MessageHeader, MessageProperties
 
 
+@use_distributed_traces
 def parse_sas_token(sas_token):
     """Parse a SAS token into its components.
 
@@ -50,6 +53,7 @@ class EventData(object):
     PROP_TIMESTAMP = b"x-opt-enqueued-time"
     PROP_DEVICE_ID = b"iothub-connection-device-id"
 
+    @use_distributed_traces
     def __init__(self, body=None, to_device=None, message=None):
         """
         Initialize EventData.
@@ -84,12 +88,15 @@ class EventData(object):
             else:
                 self.message = Message(body, properties=self.msg_properties)
 
+    @use_distributed_traces
     def __str__(self):
         dic = {
             'body': self.body_as_str(),
             'application_properties': str(self.application_properties)
         }
-
+        current_span = tracing_context.current_span.get()
+        if current_span is not None:
+            dic['distributed_tracing'] = current_span.to_header({})
         if self.sequence_number:
             dic['sequence_number'] = str(self.sequence_number)
         if self.offset:
@@ -102,6 +109,7 @@ class EventData(object):
             dic['partition_key'] = str(self.partition_key)
         return str(dic)
 
+    @use_distributed_traces
     def _set_partition_key(self, value):
         """
         Set the partition key of the event data object.
@@ -118,6 +126,7 @@ class EventData(object):
         self._annotations = annotations
 
     @property
+    @use_distributed_traces
     def sequence_number(self):
         """
         The sequence number of the event data object.
@@ -127,6 +136,7 @@ class EventData(object):
         return self._annotations.get(EventData.PROP_SEQ_NUMBER, None)
 
     @property
+    @use_distributed_traces
     def offset(self):
         """
         The offset of the event data object.
@@ -139,6 +149,7 @@ class EventData(object):
             return None
 
     @property
+    @use_distributed_traces
     def enqueued_time(self):
         """
         The enqueued timestamp of the event data object.
@@ -151,6 +162,7 @@ class EventData(object):
         return None
 
     @property
+    @use_distributed_traces
     def device_id(self):
         """
         The device ID of the event data object. This is only used for
@@ -161,6 +173,7 @@ class EventData(object):
         return self._annotations.get(EventData.PROP_DEVICE_ID, None)
 
     @property
+    @use_distributed_traces
     def partition_key(self):
         """
         The partition key of the event data object.
@@ -173,6 +186,7 @@ class EventData(object):
             return self._annotations.get(EventData.PROP_PARTITION_KEY, None)
 
     @property
+    @use_distributed_traces
     def application_properties(self):
         """
         Application defined properties on the message.
@@ -181,6 +195,7 @@ class EventData(object):
         """
         return self._app_properties
 
+    @use_distributed_traces
     @application_properties.setter
     def application_properties(self, value):
         """
@@ -194,6 +209,7 @@ class EventData(object):
         self.message.application_properties = properties
 
     @property
+    @use_distributed_traces
     def body(self):
         """
         The body of the event data object.
@@ -205,6 +221,7 @@ class EventData(object):
         except TypeError:
             raise ValueError("Message data empty.")
 
+    @use_distributed_traces
     def body_as_str(self, encoding='UTF-8'):
         """
         The body of the event data as a string if the data is of a
@@ -226,6 +243,7 @@ class EventData(object):
         except Exception as e:
             raise TypeError("Message data is not compatible with string type: {}".format(e))
 
+    @use_distributed_traces
     def body_as_json(self, encoding='UTF-8'):
         """
         The body of the event loaded as a JSON object is the data is compatible.
@@ -240,15 +258,18 @@ class EventData(object):
         except Exception as e:
             raise TypeError("Event data is not compatible with JSON type: {}".format(e))
 
+    @use_distributed_traces
     def encode_message(self):
         return self.message.encode_message()
 
 
 class _BatchSendEventData(EventData):
+    @use_distributed_traces
     def __init__(self, batch_event_data, partition_key=None):
         self.message = BatchMessage(data=batch_event_data, multi_messages=False, properties=None)
         self._set_partition_key(partition_key)
 
+    @use_distributed_traces
     def _set_partition_key(self, value):
         if value:
             annotations = self.message.annotations
@@ -279,6 +300,7 @@ class EventPosition(object):
       >>> event_pos = EventPosition(1506968696002)
     """
 
+    @use_distributed_traces
     def __init__(self, value, inclusive=False):
         """
         Initialize EventPosition.
@@ -291,9 +313,11 @@ class EventPosition(object):
         self.value = value if value is not None else "-1"
         self.inclusive = inclusive
 
+    @use_distributed_traces
     def __str__(self):
         return str(self.value)
 
+    @use_distributed_traces
     def _selector(self):
         """
         Creates a selector expression of the offset.
@@ -314,6 +338,7 @@ class EventHubSASTokenCredential(object):
     """
     SAS token used for authentication.
     """
+    @use_distributed_traces
     def __init__(self, token):
         """
         :param token: A SAS token or function that returns a SAS token. If a function is supplied,
@@ -323,6 +348,7 @@ class EventHubSASTokenCredential(object):
         """
         self.token = token
 
+    @use_distributed_traces
     def get_sas_token(self):
         if callable(self.token):
             return self.token()
@@ -334,6 +360,7 @@ class EventHubSharedKeyCredential(object):
     """
     The shared access key credential used for authentication.
     """
+    @use_distributed_traces
     def __init__(self, policy, key):
         """
         :param policy: The name of the shared access policy.
@@ -347,6 +374,7 @@ class EventHubSharedKeyCredential(object):
 
 
 class _Address(object):
+    @use_distributed_traces
     def __init__(self, hostname=None, path=None):
         self.hostname = hostname
         self.path = path
