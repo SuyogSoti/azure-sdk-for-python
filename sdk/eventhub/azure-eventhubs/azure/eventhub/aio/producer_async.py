@@ -35,7 +35,6 @@ class EventHubProducer(object):
 
     """
 
-    @use_distributed_traces
     def __init__(  # pylint: disable=super-init-not-called
         self,
         client,
@@ -103,15 +102,12 @@ class EventHubProducer(object):
         self._outcome = None
         self._condition = None
 
-    @use_distributed_traces_async
     async def __aenter__(self):
         return self
 
-    @use_distributed_traces_async
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close(exc_val)
 
-    @use_distributed_traces_async
     async def _open(self):
         """
         Open the EventHubProducer using the supplied connection.
@@ -138,7 +134,6 @@ class EventHubProducer(object):
             await self._connect()
             self.running = True
 
-    @use_distributed_traces_async
     async def _connect(self):
         connected = await self._build_connection()
         if not connected:
@@ -146,7 +141,6 @@ class EventHubProducer(object):
             while not await self._build_connection(is_reconnect=True):
                 await asyncio.sleep(self.reconnect_backoff)
 
-    @use_distributed_traces_async
     async def _build_connection(self, is_reconnect=False):
         """
 
@@ -242,11 +236,9 @@ class EventHubProducer(object):
             await self.close(exception=error)
             raise error
 
-    @use_distributed_traces_async
     async def _reconnect(self):
         return await self._build_connection(is_reconnect=True)
 
-    @use_distributed_traces_async
     async def _send_event_data(self):
         await self._open()
         max_retries = self.client.config.max_retries
@@ -329,7 +321,6 @@ class EventHubProducer(object):
                 await self.close(exception=error)
                 raise error
 
-    @use_distributed_traces
     def _check_closed(self):
         if self.error:
             raise EventHubError(
@@ -337,7 +328,6 @@ class EventHubProducer(object):
                 self.error,
             )
 
-    @use_distributed_traces
     def _on_outcome(self, outcome, condition):
         """
         Called when the outcome is received for a delivery.
@@ -351,13 +341,11 @@ class EventHubProducer(object):
         self._condition = condition
 
     @staticmethod
-    @use_distributed_traces
     def _error(outcome, condition):
         if outcome != constants.MessageSendResult.Ok:
             raise condition
 
     @staticmethod
-    @use_distributed_traces
     def _set_partition_key(event_datas, partition_key):
         ed_iter = iter(event_datas)
         for ed in ed_iter:

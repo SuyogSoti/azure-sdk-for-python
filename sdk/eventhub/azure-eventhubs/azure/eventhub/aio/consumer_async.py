@@ -35,7 +35,6 @@ class EventHubConsumer(object):
     timeout = 0
     _epoch = b'com.microsoft:epoch'
 
-    @use_distributed_traces
     def __init__(  # pylint: disable=super-init-not-called
             self, client, source, event_position=None, prefetch=300, owner_level=None,
             keep_alive=None, auto_reconnect=True, loop=None):
@@ -92,19 +91,15 @@ class EventHubConsumer(object):
             properties=self.client._create_properties(self.client.config.user_agent),  # pylint: disable=protected-access
             loop=self.loop)
 
-    @use_distributed_traces_async
     async def __aenter__(self):
         return self
 
-    @use_distributed_traces_async
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         await self.close(exc_val)
 
-    @use_distributed_traces
     def __aiter__(self):
         return self
 
-    @use_distributed_traces_async
     async def __anext__(self):
         await self._open()
         max_retries = self.client.config.max_retries
@@ -170,13 +165,11 @@ class EventHubConsumer(object):
                 await self.close(exception=error)
                 raise error
 
-    @use_distributed_traces
     def _check_closed(self):
         if self.error:
             raise EventHubError("This consumer has been closed. Please create a new consumer to receive event data.",
                                 self.error)
 
-    @use_distributed_traces_async
     async def _open(self):
         """
         Open the EventHubConsumer using the supplied connection.
@@ -210,7 +203,6 @@ class EventHubConsumer(object):
             await self._connect()
             self.running = True
 
-    @use_distributed_traces_async
     async def _connect(self):
         connected = await self._build_connection()
         if not connected:
@@ -218,7 +210,6 @@ class EventHubConsumer(object):
             while not await self._build_connection(is_reconnect=True):
                 await asyncio.sleep(self.reconnect_backoff)
 
-    @use_distributed_traces_async
     async def _build_connection(self, is_reconnect=False):  # pylint: disable=too-many-statements
         # pylint: disable=protected-access
         if is_reconnect:
@@ -298,7 +289,6 @@ class EventHubConsumer(object):
             await self.close(exception=error)
             raise error
 
-    @use_distributed_traces_async
     async def _reconnect(self):
         """If the EventHubConsumer was disconnected from the service with
         a retryable error - attempt to reconnect."""

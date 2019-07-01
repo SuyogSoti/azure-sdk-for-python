@@ -39,7 +39,6 @@ class EventHubConsumer(object):
     timeout = 0
     _epoch = b'com.microsoft:epoch'
 
-    @use_distributed_traces
     def __init__(self, client, source, event_position=None, prefetch=300, owner_level=None,
                  keep_alive=None, auto_reconnect=True):
         """
@@ -90,19 +89,15 @@ class EventHubConsumer(object):
             client_name=self.name,
             properties=self.client._create_properties(self.client.config.user_agent))  # pylint: disable=protected-access
 
-    @use_distributed_traces
     def __enter__(self):
         return self
 
-    @use_distributed_traces
     def __exit__(self, exc_type, exc_val, exc_tb):
         self.close(exc_val)
 
-    @use_distributed_traces
     def __iter__(self):
         return self
 
-    @use_distributed_traces
     def __next__(self):
         self._open()
         max_retries = self.client.config.max_retries
@@ -172,20 +167,17 @@ class EventHubConsumer(object):
                 self.close(exception=error)
                 raise error
 
-    @use_distributed_traces
     def _check_closed(self):
         if self.error:
             raise EventHubError("This consumer has been closed. Please create a new consumer to receive event data.",
                                 self.error)
 
-    @use_distributed_traces
     def _redirect(self, redirect):
         self.redirected = redirect
         self.running = False
         self.messages_iter = None
         self._open()
 
-    @use_distributed_traces
     def _open(self):
         """
         Open the EventHubConsumer using the supplied connection.
@@ -220,7 +212,6 @@ class EventHubConsumer(object):
             self._connect()
             self.running = True
 
-    @use_distributed_traces
     def _connect(self):
         connected = self._build_connection()
         if not connected:
@@ -228,7 +219,6 @@ class EventHubConsumer(object):
             while not self._build_connection(is_reconnect=True):
                 time.sleep(self.reconnect_backoff)
 
-    @use_distributed_traces
     def _build_connection(self, is_reconnect=False):
         """
 
@@ -317,7 +307,6 @@ class EventHubConsumer(object):
             self.close(exception=error)
             raise error
 
-    @use_distributed_traces
     def _reconnect(self):
         return self._build_connection(is_reconnect=True)
 

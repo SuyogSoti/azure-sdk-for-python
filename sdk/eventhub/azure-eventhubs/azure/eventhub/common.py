@@ -53,7 +53,6 @@ class EventData(object):
     PROP_TIMESTAMP = b"x-opt-enqueued-time"
     PROP_DEVICE_ID = b"iothub-connection-device-id"
 
-    @use_distributed_traces
     def __init__(self, body=None, to_device=None, message=None):
         """
         Initialize EventData.
@@ -88,7 +87,6 @@ class EventData(object):
             else:
                 self.message = Message(body, properties=self.msg_properties)
 
-    @use_distributed_traces
     def __str__(self):
         dic = {
             'body': self.body_as_str(),
@@ -106,7 +104,6 @@ class EventData(object):
             dic['partition_key'] = str(self.partition_key)
         return str(dic)
 
-    @use_distributed_traces
     def _set_partition_key(self, value):
         """
         Set the partition key of the event data object.
@@ -265,12 +262,10 @@ class EventData(object):
 
 
 class _BatchSendEventData(EventData):
-    @use_distributed_traces
     def __init__(self, batch_event_data, partition_key=None):
         self.message = BatchMessage(data=batch_event_data, multi_messages=False, properties=None)
         self._set_partition_key(partition_key)
 
-    @use_distributed_traces
     def _set_partition_key(self, value):
         annotations = self.message.annotations
         if annotations is None:
@@ -304,7 +299,6 @@ class EventPosition(object):
       >>> event_pos = EventPosition(1506968696002)
     """
 
-    @use_distributed_traces
     def __init__(self, value, inclusive=False):
         """
         Initialize EventPosition.
@@ -317,11 +311,9 @@ class EventPosition(object):
         self.value = value if value is not None else "-1"
         self.inclusive = inclusive
 
-    @use_distributed_traces
     def __str__(self):
         return str(self.value)
 
-    @use_distributed_traces
     def _selector(self):
         """
         Creates a selector expression of the offset.
@@ -342,7 +334,6 @@ class EventHubSASTokenCredential(object):
     """
     SAS token used for authentication.
     """
-    @use_distributed_traces
     def __init__(self, token):
         """
         :param token: A SAS token or function that returns a SAS token. If a function is supplied,
@@ -364,7 +355,6 @@ class EventHubSharedKeyCredential(object):
     """
     The shared access key credential used for authentication.
     """
-    @use_distributed_traces
     def __init__(self, policy, key):
         """
         :param policy: The name of the shared access policy.
@@ -378,7 +368,6 @@ class EventHubSharedKeyCredential(object):
 
 
 class _Address(object):
-    @use_distributed_traces
     def __init__(self, hostname=None, path=None):
         self.hostname = hostname
         self.path = path

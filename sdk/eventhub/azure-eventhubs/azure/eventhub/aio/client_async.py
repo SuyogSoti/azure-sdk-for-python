@@ -44,7 +44,6 @@ class EventHubClient(EventHubClientAbstract):
 
     """
 
-    @use_distributed_traces
     def _create_auth(self, username=None, password=None):
         """
         Create an ~uamqp.authentication.cbs_auth_async.SASTokenAuthAsync instance to authenticate
@@ -88,7 +87,6 @@ class EventHubClient(EventHubClientAbstract):
                                                 get_jwt_token, http_proxy=http_proxy,
                                                 transport_type=transport_type)
 
-    @use_distributed_traces_async
     async def _management_request(self, mgmt_msg, op_type):
         alt_creds = {
             "username": self._auth_config.get("iot_username"),

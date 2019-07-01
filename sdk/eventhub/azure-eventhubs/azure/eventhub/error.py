@@ -5,7 +5,6 @@
 import six
 
 from uamqp import constants, errors
-from azure.core.trace import use_distributed_traces
 
 
 _NO_RETRY_ERRORS = (
@@ -17,7 +16,6 @@ _NO_RETRY_ERRORS = (
 )
 
 
-@use_distributed_traces
 def _error_handler(error):
     """
     Called internally when an event has failed to send so we
@@ -55,7 +53,6 @@ class EventHubError(Exception):
     :vartype details: dict[str, str]
     """
 
-    @use_distributed_traces
     def __init__(self, message, details=None):
         self.error = None
         self.message = message
@@ -79,7 +76,6 @@ class EventHubError(Exception):
                 self.message += "\n{}".format(details)
         super(EventHubError, self).__init__(self.message)
 
-    @use_distributed_traces
     def _parse_error(self, error_list):
         details = []
         self.message = error_list if isinstance(error_list, six.text_type) else error_list.decode('UTF-8')
