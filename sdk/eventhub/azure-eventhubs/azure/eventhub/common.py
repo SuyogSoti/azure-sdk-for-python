@@ -94,9 +94,6 @@ class EventData(object):
             'body': self.body_as_str(),
             'application_properties': str(self.application_properties)
         }
-        current_span = tracing_context.current_span.get()
-        if current_span is not None:
-            dic['distributed_tracing'] = current_span.to_header({})
         if self.sequence_number:
             dic['sequence_number'] = str(self.sequence_number)
         if self.offset:
@@ -118,7 +115,11 @@ class EventData(object):
         :type value: str or bytes
         """
         annotations = dict(self._annotations)
-        annotations[self._partition_key] = value
+        if value is not None:
+            annotations[self._partition_key] = value
+        current_span = tracing_context.current_span.get()
+        if current_span is not None:
+            annotations.update(current_span.to_header(annotations))
         header = MessageHeader()
         header.durable = True
         self.message.annotations = annotations
@@ -271,15 +272,19 @@ class _BatchSendEventData(EventData):
 
     @use_distributed_traces
     def _set_partition_key(self, value):
+        annotations = self.message.annotations
+        if annotations is None:
+            annotations = dict()
+        current_span = tracing_context.current_span.get()
+        if current_span is not None:
+            annotations.update(current_span.to_header(annotations))
         if value:
-            annotations = self.message.annotations
-            if annotations is None:
-                annotations = dict()
             annotations[types.AMQPSymbol(EventData.PROP_PARTITION_KEY)] = value
-            header = MessageHeader()
-            header.durable = True
-            self.message.annotations = annotations
-            self.message.header = header
+        header = MessageHeader()
+        header.durable = True
+        self.message.annotations = annotations
+        self.message.header = header
+        print(self.message.annotations)
 
 
 class EventPosition(object):
