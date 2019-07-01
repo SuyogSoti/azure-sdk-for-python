@@ -284,7 +284,6 @@ class _BatchSendEventData(EventData):
         header.durable = True
         self.message.annotations = annotations
         self.message.header = header
-        print(self.message.annotations)
 
 
 class EventPosition(object):
