@@ -40,6 +40,16 @@ class DataDogSpan:
         propogator = HTTPPropagator()
         propogator.inject(self.span_instance.context, headers)
         return headers
+    
+    def from_header(self, headers):
+        # type: (Dict[str, str]) -> Any
+        from ddtrace.propagation.http import HTTPPropagator
+        from ddtrace import tracer
+
+        propogator = HTTPPropagator()
+        ctx = propogator.extract(headers)
+        tracer.context_provider.activate(ctx)
+        return tracer
 
     @staticmethod
     def end_tracer(tracer):

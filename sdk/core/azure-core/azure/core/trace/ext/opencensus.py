@@ -67,6 +67,13 @@ class OpencensusSpan:
             ctx = tracer_from_context.span_context
             temp_headers = tracer_from_context.propagator.to_headers(ctx)
         return temp_headers
+    
+    def from_header(self, headers):
+        # type: (Dict[str, str]) -> Any
+        from opencensus.trace import tracer as tracer_module
+        from opencensus.trace.propagation import trace_context_http_header_format
+        ctx = trace_context_http_header_format.TraceContextPropagator().from_headers(headers)
+        return tracer_module.Tracer(span_context=ctx)
 
     @staticmethod
     def end_tracer(tracer):

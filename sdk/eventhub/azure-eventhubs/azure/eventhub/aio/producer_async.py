@@ -11,6 +11,7 @@ from uamqp import constants, errors, compat
 from uamqp import SendClientAsync
 
 from azure.core.trace import use_distributed_traces_async, use_distributed_traces
+from azure.core.trace.context import tracing_context
 
 from azure.eventhub.common import EventData, _BatchSendEventData
 from azure.eventhub.error import (
@@ -252,6 +253,10 @@ class EventHubProducer(object):
                     self.unsent_events = self._handler.pending_messages
                 if self._outcome != constants.MessageSendResult.Ok:
                     EventHubProducer._error(self._outcome, self._condition)
+                current_span = tracing_context.current_span.get()
+                if current_span is not None:
+                    # current_span.set_annotation("number retries", connecting_count)
+                    pass
                 return
             except (
                 errors.MessageAccepted,

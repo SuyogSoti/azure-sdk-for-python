@@ -5,6 +5,7 @@
 # --------------------------------------------------------------------------
 from io import (BytesIO, IOBase, SEEK_CUR, SEEK_END, SEEK_SET, UnsupportedOperation)
 from threading import Lock
+from azure.core.trace.context import tracing_context
 
 from math import ceil
 
@@ -88,7 +89,7 @@ def _upload_blob_chunks(blob_service, container_name, blob_name,
                         running_futures.remove(f)
 
             chunk_throttler.acquire()
-            future = executor.submit(uploader.process_chunk, chunk)
+            future = executor.submit(tracing_context.with_current_context(uploader.process_chunk), chunk)
 
             # Calls callback upon completion (even if the callback was added after the Future task is done).
             future.add_done_callback(lambda x: chunk_throttler.release())
@@ -139,7 +140,7 @@ def _upload_blob_substream_blocks(blob_service, container_name, blob_name,
     if max_connections > 1:
         import concurrent.futures
         executor = concurrent.futures.ThreadPoolExecutor(max_connections)
-        range_ids = list(executor.map(uploader.process_substream_block, uploader.get_substream_blocks()))
+        range_ids = list(executor.map(tracing_context.with_current_context(uploader.process_substream_block), uploader.get_substream_blocks()))
     else:
         range_ids = [uploader.process_substream_block(result) for result in uploader.get_substream_blocks()]
 

@@ -191,15 +191,16 @@ class PrioritizedSetting(object):
     ):
 
         self._name = name
-        self._env_var = env_var
         self._system_hook = system_hook
         self._default = default
         self._convert = convert if convert else lambda x: x
         self._on_set = on_set if on_set else lambda x: x
         self._user_value = _Unset
 
-        if self._env_var and self._env_var in os.environ:
-            self._on_set(os.environ[self._env_var])
+        self._env_var = _Unset
+        if env_var and env_var in os.environ:
+            self._env_var = os.environ[self._env_var]
+            self._on_set(self._env_var)
 
     def __repr__(self):
         # type () -> str
@@ -226,8 +227,8 @@ class PrioritizedSetting(object):
             return self._convert(self._user_value)
 
         # 2. environment variable
-        if self._env_var and self._env_var in os.environ:
-            return self._convert(os.environ[self._env_var])
+        if self._env_var is not _Unset:
+            return self._convert(self._env_var)
 
         # 1. system setting
         if self._system_hook:

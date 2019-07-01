@@ -10,6 +10,7 @@ import json
 import six
 
 from azure.core.trace.context import tracing_context
+from azure.core.settings import settings
 from azure.core.trace import use_distributed_traces
 from uamqp import BatchMessage, Message, types
 from uamqp.message import MessageHeader, MessageProperties
@@ -24,10 +25,10 @@ def parse_sas_token(sas_token):
     :rtype: dict[str, str]
     """
     sas_data = {}
-    token = sas_token.partition(' ')[2]
-    fields = token.split('&')
+    token = sas_token.partition(" ")[2]
+    fields = token.split("&")
     for field in fields:
-        key, value = field.split('=', 1)
+        key, value = field.split("=", 1)
         sas_data[key.lower()] = value
     return sas_data
 
@@ -71,12 +72,24 @@ class EventData(object):
         self._app_properties = {}
         self.msg_properties = MessageProperties()
         if to_device:
-            self.msg_properties.to = '/devices/{}/messages/devicebound'.format(to_device)
+            self.msg_properties.to = "/devices/{}/messages/devicebound".format(
+                to_device
+            )
         if message:
             self.message = message
             self.msg_properties = message.properties
             self._annotations = message.annotations
             self._app_properties = message.application_properties
+            current_span = tracing_context.current_span.get()
+            if current_span is not None:
+                wrapper_class = tracing_context.convert_tracing_impl(
+                    tracing_context.tracing_impl.get()
+                )
+                if wrapper_class is not None:
+                    tracer = wrapper_class.get_current_tracer()
+                    if tracer is not None:
+                        new_tracer = wrapper_class.from_header(self._annotations)
+                        wrapper_class.set_current_tracer(new_tracer)
         else:
             if body and isinstance(body, list):
                 self.message = Message(body[0], properties=self.msg_properties)
@@ -89,19 +102,19 @@ class EventData(object):
 
     def __str__(self):
         dic = {
-            'body': self.body_as_str(),
-            'application_properties': str(self.application_properties)
+            "body": self.body_as_str(),
+            "application_properties": str(self.application_properties),
         }
         if self.sequence_number:
-            dic['sequence_number'] = str(self.sequence_number)
+            dic["sequence_number"] = str(self.sequence_number)
         if self.offset:
-            dic['offset'] = str(self.offset)
+            dic["offset"] = str(self.offset)
         if self.enqueued_time:
-            dic['enqueued_time'] = str(self.enqueued_time)
+            dic["enqueued_time"] = str(self.enqueued_time)
         if self.device_id:
-            dic['device_id'] = str(self.device_id)
+            dic["device_id"] = str(self.device_id)
         if self.partition_key:
-            dic['partition_key'] = str(self.partition_key)
+            dic["partition_key"] = str(self.partition_key)
         return str(dic)
 
     def _set_partition_key(self, value):
@@ -142,7 +155,7 @@ class EventData(object):
         :rtype: str
         """
         try:
-            return self._annotations[EventData.PROP_OFFSET].decode('UTF-8')
+            return self._annotations[EventData.PROP_OFFSET].decode("UTF-8")
         except (KeyError, AttributeError):
             return None
 
@@ -156,7 +169,7 @@ class EventData(object):
         """
         timestamp = self._annotations.get(EventData.PROP_TIMESTAMP, None)
         if timestamp:
-            return datetime.datetime.utcfromtimestamp(float(timestamp)/1000)
+            return datetime.datetime.utcfromtimestamp(float(timestamp) / 1000)
         return None
 
     @property
@@ -220,7 +233,7 @@ class EventData(object):
             raise ValueError("Message data empty.")
 
     @use_distributed_traces
-    def body_as_str(self, encoding='UTF-8'):
+    def body_as_str(self, encoding="UTF-8"):
         """
         The body of the event data as a string if the data is of a
         compatible type.
@@ -239,10 +252,12 @@ class EventData(object):
         try:
             return data.decode(encoding)
         except Exception as e:
-            raise TypeError("Message data is not compatible with string type: {}".format(e))
+            raise TypeError(
+                "Message data is not compatible with string type: {}".format(e)
+            )
 
     @use_distributed_traces
-    def body_as_json(self, encoding='UTF-8'):
+    def body_as_json(self, encoding="UTF-8"):
         """
         The body of the event loaded as a JSON object is the data is compatible.
 
@@ -263,16 +278,18 @@ class EventData(object):
 
 class _BatchSendEventData(EventData):
     def __init__(self, batch_event_data, partition_key=None):
-        self.message = BatchMessage(data=batch_event_data, multi_messages=False, properties=None)
+        self.message = BatchMessage(
+            data=batch_event_data, multi_messages=False, properties=None
+        )
         self._set_partition_key(partition_key)
 
     def _set_partition_key(self, value):
         annotations = self.message.annotations
         if annotations is None:
             annotations = dict()
-        current_span = tracing_context.current_span.get()
-        if current_span is not None:
-            annotations.update(current_span.to_header(annotations))
+        wrapper_class = tracing_context.convert_tracing_impl(tracing_context.tracing_impl.get())
+        if wrapper_class is not None:
+            annotations.update(wrapper_class.to_header(annotations))
         if value:
             annotations[types.AMQPSymbol(EventData.PROP_PARTITION_KEY)] = value
         header = MessageHeader()
@@ -322,11 +339,23 @@ class EventPosition(object):
         """
         operator = ">=" if self.inclusive else ">"
         if isinstance(self.value, datetime.datetime):
-            timestamp = (calendar.timegm(self.value.utctimetuple()) * 1000) + (self.value.microsecond/1000)
-            return ("amqp.annotation.x-opt-enqueued-time {} '{}'".format(operator, int(timestamp))).encode('utf-8')
+            timestamp = (calendar.timegm(self.value.utctimetuple()) * 1000) + (
+                self.value.microsecond / 1000
+            )
+            return (
+                "amqp.annotation.x-opt-enqueued-time {} '{}'".format(
+                    operator, int(timestamp)
+                )
+            ).encode("utf-8")
         elif isinstance(self.value, six.integer_types):
-            return ("amqp.annotation.x-opt-sequence-number {} '{}'".format(operator, self.value)).encode('utf-8')
-        return ("amqp.annotation.x-opt-offset {} '{}'".format(operator, self.value)).encode('utf-8')
+            return (
+                "amqp.annotation.x-opt-sequence-number {} '{}'".format(
+                    operator, self.value
+                )
+            ).encode("utf-8")
+        return (
+            "amqp.annotation.x-opt-offset {} '{}'".format(operator, self.value)
+        ).encode("utf-8")
 
 
 # TODO: move some behaviors to these two classes.
@@ -334,6 +363,7 @@ class EventHubSASTokenCredential(object):
     """
     SAS token used for authentication.
     """
+
     def __init__(self, token):
         """
         :param token: A SAS token or function that returns a SAS token. If a function is supplied,
@@ -355,6 +385,7 @@ class EventHubSharedKeyCredential(object):
     """
     The shared access key credential used for authentication.
     """
+
     def __init__(self, policy, key):
         """
         :param policy: The name of the shared access policy.

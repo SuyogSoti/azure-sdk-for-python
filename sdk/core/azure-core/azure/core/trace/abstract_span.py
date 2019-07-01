@@ -30,7 +30,11 @@ class AbstractSpan:
     def to_header(self, headers):
         # type: (Dict[str, str]) -> Dict[str, str]
         pass
-    
+
+    def from_header(self, headers):
+        # type: (Dict[str, str]) -> Any
+        pass
+
     @property
     def span_instance(self):
         # type: () -> Any
@@ -49,6 +53,9 @@ class AbstractSpan:
     @staticmethod
     def get_current_tracer():
         # type: () -> Any
+        """
+        Return if there is no trace in the context currently.
+        """
         pass
 
     @staticmethod
