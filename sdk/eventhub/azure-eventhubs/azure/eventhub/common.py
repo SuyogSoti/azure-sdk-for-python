@@ -80,16 +80,16 @@ class EventData(object):
             self.msg_properties = message.properties
             self._annotations = message.annotations
             self._app_properties = message.application_properties
-            current_span = tracing_context.current_span.get()
-            if current_span is not None:
-                wrapper_class = tracing_context.convert_tracing_impl(
-                    tracing_context.tracing_impl.get()
-                )
-                if wrapper_class is not None:
-                    tracer = wrapper_class.get_current_tracer()
-                    if tracer is not None:
-                        new_tracer = wrapper_class.from_header(self._annotations)
-                        wrapper_class.set_current_tracer(new_tracer)
+            # current_span = tracing_context.current_span.get()
+            # if current_span is not None:
+            #     wrapper_class = tracing_context.convert_tracing_impl(
+            #         tracing_context.tracing_impl.get()
+            #     )
+            #     if wrapper_class is not None:
+            #         tracer = wrapper_class.get_current_tracer()
+            #         if tracer is not None:
+            #             new_tracer = wrapper_class.from_header(self._annotations)
+            #             wrapper_class.set_current_tracer(new_tracer)
         else:
             if body and isinstance(body, list):
                 self.message = Message(body[0], properties=self.msg_properties)
@@ -284,12 +284,10 @@ class _BatchSendEventData(EventData):
         self._set_partition_key(partition_key)
 
     def _set_partition_key(self, value):
-        annotations = self.message.annotations
-        if annotations is None:
-            annotations = dict()
-        wrapper_class = tracing_context.convert_tracing_impl(tracing_context.tracing_impl.get())
-        if wrapper_class is not None:
-            annotations.update(wrapper_class.to_header(annotations))
+        annotations = self.message.annotations or {}
+        current_span = tracing_context.current_span.get()
+        if current_span is not None:
+            annotations.update(current_span.to_header(annotations))
         if value:
             annotations[types.AMQPSymbol(EventData.PROP_PARTITION_KEY)] = value
         header = MessageHeader()
